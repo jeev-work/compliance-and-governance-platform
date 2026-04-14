@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useMemo, ReactNode, useCallback } from 'react';
 import { generateMockData, KPIRow, FILTER_OPTIONS } from './mockData';
 
 export type Persona = 'leadership' | 'techops' | 'compliance';
@@ -6,9 +6,15 @@ export type Persona = 'leadership' | 'techops' | 'compliance';
 type FilterState = {
   persona: Persona;
   dateRange: 30 | 60 | 90;
-  verticals: string[];
+  departments: string[];
   systems: string[];
   processes: string[];
+};
+
+type DrilldownState = {
+  type: 'system' | 'process' | 'department' | 'breach' | null;
+  value: string | null;
+  row: KPIRow | null;
 };
 
 type FilterContextType = {
@@ -16,6 +22,9 @@ type FilterContextType = {
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
   filteredData: KPIRow[];
   allData: KPIRow[];
+  drilldown: DrilldownState;
+  openDrilldown: (type: DrilldownState['type'], value: string | null, row?: KPIRow | null) => void;
+  closeDrilldown: () => void;
 };
 
 const FilterContext = createContext<FilterContextType | null>(null);
@@ -26,25 +35,36 @@ export function useFilters() {
   return ctx;
 }
 
-const allData = generateMockData(600);
+// Generate once - 30K rows
+const allData = generateMockData(30000);
 
 export function FilterProvider({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState<FilterState>({
     persona: 'leadership',
     dateRange: 30,
-    verticals: [],
+    departments: [],
     systems: [],
     processes: [],
   });
 
+  const [drilldown, setDrilldown] = useState<DrilldownState>({ type: null, value: null, row: null });
+
+  const openDrilldown = useCallback((type: DrilldownState['type'], value: string | null, row?: KPIRow | null) => {
+    setDrilldown({ type, value, row: row ?? null });
+  }, []);
+
+  const closeDrilldown = useCallback(() => {
+    setDrilldown({ type: null, value: null, row: null });
+  }, []);
+
   const filteredData = useMemo(() => {
-    const cutoff = new Date();
+    const cutoff = new Date(2026, 3, 14); // Use same baseline as mock data
     cutoff.setDate(cutoff.getDate() - filters.dateRange);
     const cutoffStr = cutoff.toISOString().split('T')[0];
 
     return allData.filter((row) => {
       if (row.date < cutoffStr) return false;
-      if (filters.verticals.length > 0 && !filters.verticals.includes(row.vertical)) return false;
+      if (filters.departments.length > 0 && !filters.departments.includes(row.department)) return false;
       if (filters.systems.length > 0 && !filters.systems.includes(row.system)) return false;
       if (filters.processes.length > 0 && !filters.processes.includes(row.process)) return false;
       return true;
@@ -52,7 +72,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   }, [filters]);
 
   return (
-    <FilterContext.Provider value={{ filters, setFilters, filteredData, allData }}>
+    <FilterContext.Provider value={{ filters, setFilters, filteredData, allData, drilldown, openDrilldown, closeDrilldown }}>
       {children}
     </FilterContext.Provider>
   );
