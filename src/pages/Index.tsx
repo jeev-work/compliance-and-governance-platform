@@ -1,16 +1,32 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { FilterProvider, useFilters } from '@/lib/filterContext';
+import { AppSidebar } from '@/components/AppSidebar';
+import { GlobalFilterBar } from '@/components/GlobalFilterBar';
+import { LeadershipView } from '@/components/views/LeadershipView';
+import { TechOpsView } from '@/components/views/TechOpsView';
+import { ComplianceView } from '@/components/views/ComplianceView';
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+function DashboardContent() {
+  const { filters } = useFilters();
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="flex min-h-screen w-full">
+      <AppSidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <GlobalFilterBar />
+        <main className="flex-1 p-3 overflow-y-auto scrollbar-thin">
+          {filters.persona === 'leadership' && <LeadershipView />}
+          {filters.persona === 'techops' && <TechOpsView />}
+          {filters.persona === 'compliance' && <ComplianceView />}
+        </main>
+      </div>
     </div>
   );
-};
+}
 
-const Index = PlaceholderIndex;
-
-export default Index;
+export default function Index() {
+  return (
+    <FilterProvider>
+      <DashboardContent />
+    </FilterProvider>
+  );
+}
