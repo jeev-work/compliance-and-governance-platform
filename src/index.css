@@ -86,4 +86,5 @@
   .bg-rag-green { background-color: hsl(var(--rag-green-bg)); }
   .bg-rag-amber { background-color: hsl(var(--rag-amber-bg)); }
   .bg-rag-red { background-color: hsl(var(--rag-red-bg)); }
+  .text-chart-5 { color: hsl(var(--chart-5)); }
 }
