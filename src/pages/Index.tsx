@@ -4,6 +4,7 @@ import { GlobalFilterBar } from '@/components/GlobalFilterBar';
 import { LeadershipView } from '@/components/views/LeadershipView';
 import { TechOpsView } from '@/components/views/TechOpsView';
 import { ComplianceView } from '@/components/views/ComplianceView';
+import { DrilldownPanel } from '@/components/DrilldownPanel';
 
 function DashboardContent() {
   const { filters } = useFilters();
@@ -19,6 +20,7 @@ function DashboardContent() {
           {filters.persona === 'compliance' && <ComplianceView />}
         </main>
       </div>
+      <DrilldownPanel />
     </div>
   );
 }
