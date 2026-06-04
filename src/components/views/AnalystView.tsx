@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend, Cell } from 'recharts';
-import { TrendingUp, BarChart3, Calendar } from 'lucide-react';
+import { TrendingUp, BarChart3, Calendar, Phone, Mail } from 'lucide-react';
+import { CHART_TOOLTIP } from '@/lib/utils';
+import { SYSTEM_SPOC_MAP } from '@/lib/mockData';
 
 const LOB_COLORS: Record<string, string> = {
   B2B: 'hsl(210 100% 56%)',
