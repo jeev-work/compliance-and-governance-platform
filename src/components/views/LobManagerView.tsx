@@ -23,7 +23,7 @@ export function LobManagerView() {
     const systems = Array.from(new Set(filteredData.map(r => r.system)));
     const procs = Array.from(new Set(filteredData.map(r => r.process)));
     const order: RagState[] = ['GREEN', 'BLUE', 'UNCONFIGURED', 'AMBER', 'GREY', 'RED'];
-    const cell = (sys: string, p: string) => {
+    const cell = (sys: string, p: string): { worst: RagState; breaches: number; exec: number; count: number } | null => {
       const rows = filteredData.filter(r => r.system === sys && r.process === p);
       if (!rows.length) return null;
       let worst: RagState = 'GREEN';
