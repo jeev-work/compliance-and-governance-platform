@@ -6,7 +6,7 @@ import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
   Flag, Wrench, GitFork, Send, FileDown, ShieldAlert,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
 
@@ -50,16 +50,41 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     });
     toast.success(`${row.id} acknowledged — chase timer halted`);
   };
+  const verifyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (verifyTimer.current) clearTimeout(verifyTimer.current); }, []);
+
   const onDeploy = () => {
+    const now = new Date().toISOString();
     mutateRow(row.id, {
       resolutionStatus: 'Verifying',
       stateFlags: row.stateFlags.filter(f => f !== 'Unacknowledged').concat('Verifying'),
       chaseTimeline: [...row.chaseTimeline,
-        { step: 'Resolved', timestamp: new Date().toISOString(), actor: 'You' },
-        { step: 'Verifying', timestamp: new Date().toISOString(), actor: 'System' },
+        { step: 'Resolved', timestamp: now, actor: 'You' },
+        { step: 'Verifying', timestamp: now, actor: 'System' },
       ],
     });
-    toast.success(`Deploy Resolution sent — system verifying telemetry return to GREEN`);
+    toast.success(`Deploy Resolution sent — verifying telemetry (3s)…`);
+
+    if (verifyTimer.current) clearTimeout(verifyTimer.current);
+    verifyTimer.current = setTimeout(() => {
+      const closedAt = new Date().toISOString();
+      mutateRow(row.id, {
+        resolutionStatus: 'Resolved',
+        status: 'CLEAN',
+        ragState: 'GREEN',
+        severity: 'Low',
+        riskScore: 0,
+        breaches: 0,
+        failureRate: 0,
+        stateFlags: row.stateFlags.filter(f => f !== 'Unacknowledged' && f !== 'Verifying' && f !== 'Escalated'),
+        chaseTimeline: [...row.chaseTimeline,
+          { step: 'Resolved', timestamp: now, actor: 'You' },
+          { step: 'Verifying', timestamp: now, actor: 'System' },
+          { step: 'Closed', timestamp: closedAt, actor: 'System' },
+        ],
+      });
+      toast.success(`${row.id} verified & closed — RAG back to GREEN`);
+    }, 3000);
   };
   const onTagDep = () => {
     mutateRow(row.id, {
@@ -77,7 +102,15 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     });
     toast.error(`EXECUTIVE FLAG raised — SLA timer nullified, Level 2 escalation`);
   };
-  const onReassign = () => toast.success(`${row.id} reassigned within LoB`);
+  const onReassign = () => {
+    const pool = ['J. Chen', 'M. Patel', 'S. Kumar', 'A. Williams', 'R. Thompson', 'K. Garcia'].filter(n => n !== row.assignee?.name);
+    const next = pool[Math.floor(Math.random() * pool.length)];
+    mutateRow(row.id, {
+      assignee: { name: next, role: 'Sr. Engineer' },
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: new Date().toISOString(), actor: `Reassigned → ${next}` }],
+    });
+    toast.success(`${row.id} reassigned to ${next}`);
+  };
   const onEscalate = () => {
     mutateRow(row.id, { resolutionStatus: 'Escalated to HOD', stateFlags: row.stateFlags.concat('Escalated') });
     toast.success(`Escalated to HOD`);

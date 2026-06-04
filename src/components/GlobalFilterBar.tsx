@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Info } from 'lucide-react';
+import { CalendarIcon, Info, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
 
@@ -43,6 +43,28 @@ export function GlobalFilterBar() {
 
   return (
     <div className="border-b border-border bg-card px-3 py-2 flex items-center gap-2 flex-wrap">
+      {/* Global search */}
+      <div className="relative">
+        <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <input
+          value={filters.searchQuery}
+          onChange={(e) => setFilters(f => ({ ...f, searchQuery: e.target.value }))}
+          placeholder="Search KPI, system, LoB, assignee, hash…"
+          className="h-7 w-[240px] text-xs bg-secondary border border-border rounded pl-7 pr-6 focus:outline-none focus:border-primary/50"
+        />
+        {filters.searchQuery && (
+          <button
+            onClick={() => setFilters(f => ({ ...f, searchQuery: '' }))}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-accent rounded"
+            aria-label="Clear search"
+          >
+            <X className="h-3 w-3 text-muted-foreground" />
+          </button>
+        )}
+      </div>
+
+      <div className="w-px h-5 bg-border" />
+
       {/* Role */}
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Role</span>
