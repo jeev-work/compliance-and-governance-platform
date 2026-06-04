@@ -115,7 +115,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     const ts = new Date().toISOString();
     mutateRow(row.id, {
       dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open' },
-      stateFlags: row.stateFlags.filter(f => f !== 'Cross-Functional').concat('Cross-Functional'),
+      stateFlags: [...row.stateFlags.filter(f => f !== 'Cross-Functional'), 'Cross-Functional'],
       chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${team}` }],
       ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency ENABLED', 'SPOC · You', `Notified ${team}${reason ? ` · ${reason}` : ''} · primary SLA timer paused`)),
     });
