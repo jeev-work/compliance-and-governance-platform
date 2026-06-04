@@ -333,7 +333,9 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
             <ActionBtn icon={Wrench} label="Deploy Resolution" onClick={onDeploy} variant="primary" />
           )}
           {actions.includes('tagDependency') && (
-            <ActionBtn icon={GitFork} label="Tag Multi-Team Dependency" onClick={onTagDep} />
+            row.dependency
+              ? <ActionBtn icon={GitFork} label="Disable Multi-Team Dependency" onClick={openDisableDep} variant="amber" />
+              : <ActionBtn icon={GitFork} label="Enable Multi-Team Dependency"  onClick={openEnableDep} />
           )}
           {actions.includes('reassign') && <ActionBtn icon={User} label="Reassign" onClick={onReassign} />}
           {actions.includes('escalate') && <ActionBtn icon={ArrowUpRight} label="Escalate" onClick={onEscalate} variant="amber" />}
