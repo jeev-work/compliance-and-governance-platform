@@ -121,8 +121,21 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     });
   }, [filters, allData]);
 
+  // History view: triggered when search query exactly matches a KPI id (case-insensitive).
+  // Returns ALL rows in allData sharing (system, process, lob) — the API's lifetime trail.
+  const historyView = useMemo<HistoryView>(() => {
+    const q = filters.searchQuery.trim().toLowerCase();
+    if (!q.startsWith('kpi-')) return null;
+    const pivot = allData.find(r => r.id.toLowerCase() === q);
+    if (!pivot) return null;
+    const rows = allData
+      .filter(r => r.system === pivot.system && r.process === pivot.process && r.lob === pivot.lob)
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    return { pivot, rows };
+  }, [filters.searchQuery, allData]);
+
   return (
-    <FilterContext.Provider value={{ filters, setFilters, filteredData, allData, drilldown, openDrilldown, closeDrilldown, mutateRow }}>
+    <FilterContext.Provider value={{ filters, setFilters, filteredData, allData, historyView, drilldown, openDrilldown, closeDrilldown, mutateRow }}>
       {children}
     </FilterContext.Provider>
   );
