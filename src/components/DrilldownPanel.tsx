@@ -373,6 +373,89 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Multi-Team Dependency toggle modal */}
+      {depModal && (
+        <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDepModal(null)}>
+          <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <GitFork className="h-4 w-4 text-chart-5" />
+                {depModal.mode === 'enable' ? 'Enable Multi-Team Dependency' : 'Disable Multi-Team Dependency'}
+              </h3>
+              <button onClick={() => setDepModal(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+            </div>
+
+            {depModal.mode === 'enable' && depModal.step === 'form' && (
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Notify Team</label>
+                  <select
+                    value={depModal.team}
+                    onChange={(e) => setDepModal({ ...depModal, team: e.target.value })}
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  >
+                    {DEPENDENCY_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reason (optional)</label>
+                  <input
+                    value={depModal.reason}
+                    onChange={(e) => setDepModal({ ...depModal, reason: e.target.value })}
+                    placeholder="e.g. upstream firewall rule blocking traffic"
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button onClick={() => setDepModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
+                  <button
+                    onClick={() => setDepModal({ ...depModal, step: 'confirm' })}
+                    className="text-[11px] px-3 py-1 rounded border bg-primary/15 border-primary/40 text-primary font-semibold hover:bg-primary/25"
+                  >Next →</button>
+                </div>
+              </div>
+            )}
+
+            {depModal.step === 'confirm' && (
+              <div className="p-4 space-y-3">
+                <div className="flex items-start gap-2 p-3 rounded border border-rag-amber bg-rag-amber">
+                  <AlertTriangle className="h-4 w-4 rag-amber shrink-0 mt-0.5" />
+                  <div className="text-[11px]">
+                    <div className="font-semibold text-foreground mb-1">Are you sure?</div>
+                    {depModal.mode === 'enable' ? (
+                      <div className="text-muted-foreground">
+                        This will <span className="text-foreground font-semibold">notify {depModal.team}</span> and <span className="text-foreground font-semibold">pause the primary SLA timer</span>. This action will be written to the immutable audit ledger.
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground">
+                        This will <span className="text-foreground font-semibold">de-notify {row.dependency?.team}</span> and <span className="text-foreground font-semibold">resume the primary SLA timer</span>. This action will be written to the immutable audit ledger.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => depModal.mode === 'enable' ? setDepModal({ ...depModal, step: 'form' }) : setDepModal(null)}
+                    className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent"
+                  >Cancel</button>
+                  <button
+                    onClick={() => depModal.mode === 'enable' ? commitEnableDep(depModal.team, depModal.reason) : commitDisableDep()}
+                    className={cn(
+                      'text-[11px] px-3 py-1 rounded border font-semibold flex items-center gap-1',
+                      depModal.mode === 'enable'
+                        ? 'bg-primary/15 border-primary/40 text-primary hover:bg-primary/25'
+                        : 'bg-rag-amber border-rag-amber rag-amber hover:opacity-80',
+                    )}
+                  >
+                    <Lock className="h-3 w-3" /> Confirm &amp; Ledger
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
