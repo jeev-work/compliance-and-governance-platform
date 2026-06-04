@@ -1,53 +1,66 @@
-# Make actions real + global search
+## 1. Fix dark-on-dark chart tooltips (all views)
 
-## 1. Global search in filter ribbon
+Every `<Tooltip contentStyle={...}>` currently uses `background: 'hsl(222 44% 8%)'` and inherits dark text — values become illegible on the dark card.
 
-**File:** `src/lib/filterContext.tsx`
-- Add `searchQuery: string` to `FilterState` (default `''`).
-- In `filteredData` memo, when `searchQuery` is non-empty (case-insensitive trim), keep rows where any of these contain the query: `id`, `system`, `process`, `lob`, `assignee?.name`, `auditLedgerId`, `resolutionStatus`.
+Replace the inline `contentStyle` with semantic, readable tokens across every chart in:
+- `ExecutiveView` (pie, line, bar — 3 tooltips)
+- `AnalystView` (line + bar — 2 tooltips)
+- `LobManagerView`, `SpocView`, `ComplianceView`, `AdminHealthView`, `DrilldownPanel` group view
 
-**File:** `src/components/GlobalFilterBar.tsx`
-- Add a compact `<input>` with a `Search` icon (lucide) on the left side of the ribbon, ~220px wide, `h-7 text-xs`, placeholder `Search KPI, system, LoB, assignee, hash…`.
-- Debounce-free, bound directly to `filters.searchQuery`.
-- Show a small `×` clear button when non-empty.
-- Matches existing ribbon styling tokens (`bg-secondary border border-border rounded`).
+New shared style (extract a `CHART_TOOLTIP` constant in `src/lib/utils.ts`):
+```
+{
+  background: 'hsl(var(--popover))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: 6,
+  color: 'hsl(var(--popover-foreground))',
+  fontSize: 11,
+  boxShadow: '0 4px 12px hsl(0 0% 0% / 0.4)',
+}
+```
+Also pass `labelStyle={{ color: 'hsl(var(--foreground))' }}` and `itemStyle={{ color: 'hsl(var(--foreground))' }}` so series labels stay legible.
 
-All 6 role views automatically benefit since they consume `filteredData`.
+## 2. Multi-Team Dependency — toggle Enable / Disable with confirm + ledger
 
-## 2. Action buttons → real mutations + toast (already wired via `mutateRow`)
+In `DrilldownPanel.BreachDetail` (SPOC role):
 
-Audit `DrilldownPanel.tsx` and ensure each role-gated action both calls `mutateRow(id, patch)` AND `toast.success(...)`. Patches:
+- Replace the single `Tag Multi-Team Dependency` button with a dynamic control:
+  - If `row.dependency == null`: button **"Enable Multi-Team Dependency"** → opens a small inline modal asking *which team to notify* (dropdown of `DEPENDENCY_TEAMS` from `mockData`) + optional reason. Confirm step: "Are you sure? This will pause the primary SLA timer." Cancel/Confirm.
+  - If `row.dependency != null`: button **"Disable Multi-Team Dependency"** (variant=amber) → confirm "Are you sure? Primary SLA timer will resume." Cancel/Confirm.
 
-| Action | Role | Patch applied to row |
-|---|---|---|
-| Acknowledge | SPOC | `stateFlags: [...flags, 'Acknowledged']`, append chase event `{ ts: now, kind: 'Acknowledged', by: 'SPOC' }` |
-| Tag Dependency | SPOC | `stateFlags: [...flags, 'Cross-Functional']`, push a sub-ticket card into `dependencies` |
-| Deploy Resolution | SPOC | Two-step: immediately `resolutionStatus: 'Verifying'`, `stateFlags: [...flags, 'Verifying']`, chase event `Deployed`. After 3s `setTimeout`, second `mutateRow` → `resolutionStatus: 'Resolved'`, `status: 'CLEAN'`, `ragState: 'Green'`, chase event `Verified & Closed`. Toast on each step. |
-| Reassign | LOB Manager | `assignee: { name: <picked>, team: … }`, chase event `Reassigned to <name>` |
-| Escalate | LOB Manager | `resolutionStatus: 'Escalated to HOD'`, `stateFlags: [...flags, 'Escalated']`, chase event `Escalated to HOD` |
-| Executive Flag | Executive | `executiveFlag: true`, `severity: 'Critical'`, chase event `Executive Flagged` |
-| Export Audit | Compliance | No mutation; `toast.success("Exported · hash <auditLedgerId>")` only (already correct) |
+- On Enable confirm: `mutateRow` sets `dependency = { team, timestamp, linkedId: SUB-xxxxx, status: 'open' }`, appends `Cross-Functional` flag, AND appends a new entry to `row.comments` of role `'System · Ledger'` with text `Dependency ENABLED → ${team} · ledger ${row.auditLedgerId}-D${seq}`. Toast success.
+- On Disable confirm: `mutateRow` clears `dependency = null`, removes `Cross-Functional` flag, appends ledger comment `Dependency DISABLED · ledger ${row.auditLedgerId}-D${seq}`. Toast success.
 
-Each action closes/keeps drilldown open per current behaviour. The `mutateRow` already syncs the open drilldown row, so timeline + badges update live without manual reopen.
+Both events also append a `ChaseEvent` (`{ step: 'Notified', actor: 'Dependency Toggle' }`) so the chase timeline reflects them, and the existing **Activity Log** card surfaces the ledger entry (acts as the immutable trail for the demo).
 
-## 3. Visible UI updates that ripple from mutations
+## 3. Global search → full KPI history view
 
-These already re-render off `allData` / `filteredData`, but confirm:
-- Executive view: `executiveFlag` banner appears immediately; flagged tile gets pulse via existing `exec-pulse` class.
-- LOB Manager matrix counts shift when severity / status changes.
-- SPOC inbox row disappears from "Unacknowledged" group after Acknowledge.
-- Compliance Kanban: card moves between columns (`Investigating` → `Verifying` → `Resolved`) live.
-- Drilldown chase timeline gets a new line for every action.
+Today, when the global search matches a `KPI-xxxxx` id, the row appears in the active view's table but its **per-KPI lifecycle** is only visible by clicking. We add a dedicated history surface:
 
-No animation polish in this pass beyond the already-defined `exec-pulse`.
+- Extend `filterContext`: when `searchQuery` exactly matches one or more rows by `id` prefix `KPI-`, expose a derived `historyView = { id, rows: KPIRow[] }` — rows sorted by `timestamp asc` across `allData` (ignoring date filter), where any row shares the same `id`. Since each `KPI-id` is unique in mock, also include rows with the same `(system, process, lob)` triple — that is the "API's lifetime log".
+- New component `src/components/KpiHistoryPanel.tsx` rendered in `Index.tsx` above the role view whenever `historyView` is active (search bar shows a small "Showing lifetime history for KPI-xxxxx · clear" pill).
+- Panel contents:
+  - Header: KPI id, system/process/LoB, current RAG, current assignee + SPOC contact (name, role, email pattern `${first}.${last}@gov.demo`, on-call phone placeholder).
+  - **Performance strip** (always shown): sparkline of `failureRate` over time, count of total events, current SLA%, MTTR, MTTD.
+  - **Malfunction History timeline** (hidden for `analyst` role — see §4): chronological list of each historical breach with severity, RAG, resolutionStatus, assignee, actions taken (derived from each row's `chaseTimeline`, `escalations`, `comments`, `dependency`), and the ledger hash for that incident. Each entry expands to show the full chase timeline inline.
+  - "Open latest incident" button → `openDrilldown('breach', latestRow.id, latestRow)`.
 
-## 4. Tech notes
+## 4. Analyst / Generic Viewer scope
 
-- `setTimeout` for Deploy Resolution stored in a `useRef` so the panel can clear it if user closes the drilldown mid-flight.
-- All mutations are pure in-memory via the existing `mutateRow` in `filterContext`. No persistence, no backend.
-- Search trims and lowercases once per render; perf fine at 30k rows since `filteredData` already iterates the whole set.
+- In `KpiHistoryPanel`, gate the Malfunction History section behind `filters.role !== 'analyst'`. Analyst sees only the **Performance strip** + a **"SPOC Contact"** card with:
+  - SPOC name + role (from current assignee, or system-default mapping if null)
+  - Email + phone (mocked) + Teams handle
+  - "Request more details" button → `toast.success('Request sent to {SPOC}')` (no mutation)
+- In `AnalystView`, add a small footer note "For incident-level details, contact the system SPOC" and surface the system→SPOC mapping table (read from a new constant `SYSTEM_SPOC_MAP` in `mockData.ts` so the same data feeds both views).
+
+## Technical notes
+
+- New file: `src/components/KpiHistoryPanel.tsx`.
+- Edits: `src/lib/utils.ts` (add `CHART_TOOLTIP`), `src/lib/filterContext.tsx` (add `historyView` selector), `src/lib/mockData.ts` (add `SYSTEM_SPOC_MAP`), `src/pages/Index.tsx` (mount panel), `src/components/DrilldownPanel.tsx` (dependency toggle + confirm modal), and all 6 view files (swap tooltip styles).
+- No backend, no new types beyond optional `ledgerEntries?: {ts; text; hash}[]` on `KPIRow` if we want stronger separation than reusing `comments` — default is to reuse `comments` to keep the diff small. Confirm preference if you'd rather have a dedicated `ledgerEntries` array.
 
 ## Out of scope
 
-- No new fields on `KPIRow` beyond what the rewritten `mockData.ts` already exposes (`chaseTimeline`, `dependencies`, `executiveFlag`, `assignee`, `auditLedgerId`, `slaVersion`).
-- No backend, no real audit hashing, no animations beyond existing tokens.
+- No real cryptographic hashing — ledger hashes stay mocked.
+- No backend/persistence — refresh resets state.
+- No animations beyond existing `exec-pulse`.

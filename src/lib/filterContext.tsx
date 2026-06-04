@@ -25,11 +25,17 @@ type DrilldownState = {
   row: KPIRow | null;
 };
 
+export type HistoryView = {
+  pivot: KPIRow;
+  rows: KPIRow[]; // all rows sharing (system, process, lob), sorted asc by timestamp
+} | null;
+
 type Ctx = {
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
   filteredData: KPIRow[];
   allData: KPIRow[];
+  historyView: HistoryView;
   drilldown: DrilldownState;
   openDrilldown: (type: DrilldownState['type'], value: string | null, row?: KPIRow | null) => void;
   closeDrilldown: () => void;
@@ -115,8 +121,21 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     });
   }, [filters, allData]);
 
+  // History view: triggered when search query exactly matches a KPI id (case-insensitive).
+  // Returns ALL rows in allData sharing (system, process, lob) — the API's lifetime trail.
+  const historyView = useMemo<HistoryView>(() => {
+    const q = filters.searchQuery.trim().toLowerCase();
+    if (!q.startsWith('kpi-')) return null;
+    const pivot = allData.find(r => r.id.toLowerCase() === q);
+    if (!pivot) return null;
+    const rows = allData
+      .filter(r => r.system === pivot.system && r.process === pivot.process && r.lob === pivot.lob)
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    return { pivot, rows };
+  }, [filters.searchQuery, allData]);
+
   return (
-    <FilterContext.Provider value={{ filters, setFilters, filteredData, allData, drilldown, openDrilldown, closeDrilldown, mutateRow }}>
+    <FilterContext.Provider value={{ filters, setFilters, filteredData, allData, historyView, drilldown, openDrilldown, closeDrilldown, mutateRow }}>
       {children}
     </FilterContext.Provider>
   );

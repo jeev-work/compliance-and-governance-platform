@@ -46,6 +46,7 @@ export type EscalationEntry = { from: string; to: string; timestamp: string; rea
 export type CommentEntry = { author: string; role: string; timestamp: string; text: string };
 export type ChaseEvent = { step: ChaseStep; timestamp: string; actor: string };
 export type DependencyFork = { team: string; timestamp: string; linkedId: string; status: 'open' | 'resolved' };
+export type LedgerEntry = { timestamp: string; actor: string; action: string; hash: string; details?: string };
 
 export type KPIRow = {
   id: string;
@@ -78,6 +79,17 @@ export type KPIRow = {
   resolvedBy: string | null;
   severity: Severity;
   riskScore: number;
+  ledgerEntries: LedgerEntry[];
+};
+
+/** System → primary SPOC contact map (used by Analyst & History views) */
+export const SYSTEM_SPOC_MAP: Record<string, { name: string; role: string; email: string; phone: string; teams: string }> = {
+  'Core Banking':    { name: 'J. Chen',     role: 'Sr. Engineer · Core Banking SPOC', email: 'j.chen@gov.demo',     phone: '+1-555-0142', teams: '@jchen' },
+  'Payment Gateway': { name: 'S. Kumar',    role: 'DevOps Manager · Payments SPOC',   email: 's.kumar@gov.demo',    phone: '+1-555-0188', teams: '@skumar' },
+  'CRM':             { name: 'R. Thompson', role: 'IT Support Lead · CRM SPOC',       email: 'r.thompson@gov.demo', phone: '+1-555-0211', teams: '@rthompson' },
+  'Document Cloud':  { name: 'K. Garcia',   role: 'Security Architect · DocCloud SPOC', email: 'k.garcia@gov.demo', phone: '+1-555-0247', teams: '@kgarcia' },
+  'Data Warehouse':  { name: 'A. Williams', role: 'Risk Analyst · DWH SPOC',          email: 'a.williams@gov.demo', phone: '+1-555-0266', teams: '@awilliams' },
+  'Auth Engine':     { name: 'M. Patel',    role: 'Compliance Lead · Auth SPOC',      email: 'm.patel@gov.demo',    phone: '+1-555-0299', teams: '@mpatel' },
 };
 
 function seeded(seed: number) {
@@ -276,6 +288,9 @@ export function generateMockData(count = 30000): KPIRow[] {
       resolvedBy,
       severity,
       riskScore,
+      ledgerEntries: [
+        { timestamp: ts.toISOString(), actor: 'System', action: 'KPI Generated', hash: fakeHash(rand, 'LDG'), details: `RAG=${ragState} · sev=${severity}` },
+      ],
     });
   }
 

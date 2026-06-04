@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useFilters } from '@/lib/filterContext';
-import { cn } from '@/lib/utils';
+import { cn, CHART_TOOLTIP } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { ChevronUp, ChevronDown, Inbox, Wrench, GitFork, ShieldAlert } from 'lucide-react';
 import { RagState } from '@/lib/mockData';
@@ -65,7 +65,7 @@ export function SpocView() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
             <XAxis type="number" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
             <YAxis type="category" dataKey="name" tick={{ fontSize: 8, fill: 'hsl(215 15% 50%)' }} width={90} />
-            <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+            <Tooltip {...CHART_TOOLTIP} />
             <Bar dataKey="breaches" cursor="pointer">
               {breachBySystem.map((d, i) => <Cell key={i} fill={d.critical > 0 ? 'hsl(0 72% 51%)' : 'hsl(38 92% 50%)'} />)}
             </Bar>

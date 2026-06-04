@@ -1,14 +1,23 @@
 import { useFilters } from '@/lib/filterContext';
-import { ChaseStep, KPIRow, RagState } from '@/lib/mockData';
+import { ChaseStep, KPIRow, RagState, LedgerEntry } from '@/lib/mockData';
 import { ROLE_ACTIONS } from '@/lib/rbac';
-import { cn } from '@/lib/utils';
+import { cn, CHART_TOOLTIP } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert,
+  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock,
 } from 'lucide-react';
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
+
+const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Security Eng', 'Cloud Platform'];
+
+function newLedgerEntry(action: string, actor: string, details?: string): LedgerEntry {
+  const hex = 'abcdef0123456789';
+  let h = '';
+  for (let i = 0; i < 16; i++) h += hex[Math.floor(Math.random() * 16)];
+  return { timestamp: new Date().toISOString(), actor, action, hash: `LDG-${h}`, details };
+}
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green rag-green',
@@ -40,13 +49,19 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
   const { filters, mutateRow } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
+  // Dependency toggle modal state
+  const [depModal, setDepModal] = useState<null | { mode: 'enable' | 'disable'; team: string; reason: string; step: 'form' | 'confirm' }>(null);
+
   const fmt = (m: number | null) => !m ? '—' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+
+  const appendLedger = (entry: LedgerEntry) => [...row.ledgerEntries, entry];
 
   const onAcknowledge = () => {
     mutateRow(row.id, {
       resolutionStatus: 'Investigating',
       stateFlags: row.stateFlags.filter(f => f !== 'Unacknowledged').concat('Acknowledged'),
       chaseTimeline: [...row.chaseTimeline, { step: 'Acknowledged', timestamp: new Date().toISOString(), actor: 'You' }],
+      ledgerEntries: appendLedger(newLedgerEntry('Acknowledged', 'SPOC · You', 'Chase timer halted')),
     });
     toast.success(`${row.id} acknowledged — chase timer halted`);
   };
@@ -62,6 +77,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
         { step: 'Resolved', timestamp: now, actor: 'You' },
         { step: 'Verifying', timestamp: now, actor: 'System' },
       ],
+      ledgerEntries: appendLedger(newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification')),
     });
     toast.success(`Deploy Resolution sent — verifying telemetry (3s)…`);
 
@@ -82,23 +98,50 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           { step: 'Verifying', timestamp: now, actor: 'System' },
           { step: 'Closed', timestamp: closedAt, actor: 'System' },
         ],
+        ledgerEntries: [
+          ...row.ledgerEntries,
+          newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification'),
+          newLedgerEntry('Verified & Closed', 'System · Telemetry', 'RAG returned to GREEN'),
+        ],
       });
       toast.success(`${row.id} verified & closed — RAG back to GREEN`);
     }, 3000);
   };
-  const onTagDep = () => {
+
+  const openEnableDep  = () => setDepModal({ mode: 'enable',  team: DEPENDENCY_TEAMS[0], reason: '', step: 'form' });
+  const openDisableDep = () => setDepModal({ mode: 'disable', team: row.dependency?.team ?? '', reason: '', step: 'confirm' });
+
+  const commitEnableDep = (team: string, reason: string) => {
+    const ts = new Date().toISOString();
     mutateRow(row.id, {
-      dependency: { team: 'Network Ops', timestamp: new Date().toISOString(), linkedId: `SUB-${Math.floor(Math.random() * 99999)}`, status: 'open' },
-      stateFlags: row.stateFlags.concat('Cross-Functional'),
+      dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open' },
+      stateFlags: [...row.stateFlags.filter(f => f !== 'Cross-Functional'), 'Cross-Functional'],
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${team}` }],
+      ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency ENABLED', 'SPOC · You', `Notified ${team}${reason ? ` · ${reason}` : ''} · primary SLA timer paused`)),
     });
-    toast.success(`Forked to Network Ops — primary SLA timer paused`);
+    setDepModal(null);
+    toast.success(`Multi-team dependency ENABLED → ${team} notified · ledgered`);
   };
+  const commitDisableDep = () => {
+    const ts = new Date().toISOString();
+    const prevTeam = row.dependency?.team ?? 'unknown';
+    mutateRow(row.id, {
+      dependency: null,
+      stateFlags: row.stateFlags.filter(f => f !== 'Cross-Functional'),
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency cleared (${prevTeam})` }],
+      ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency DISABLED', 'SPOC · You', `${prevTeam} de-notified · primary SLA timer resumed`)),
+    });
+    setDepModal(null);
+    toast.success(`Multi-team dependency DISABLED · ledgered`);
+  };
+
   const onExec = () => {
     mutateRow(row.id, {
       executiveFlag: true,
       ragState: 'RED',
       resolutionStatus: 'Escalated to HOD',
       stateFlags: row.stateFlags.concat('Escalated'),
+      ledgerEntries: appendLedger(newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation')),
     });
     toast.error(`EXECUTIVE FLAG raised — SLA timer nullified, Level 2 escalation`);
   };
@@ -108,14 +151,20 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     mutateRow(row.id, {
       assignee: { name: next, role: 'Sr. Engineer' },
       chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: new Date().toISOString(), actor: `Reassigned → ${next}` }],
+      ledgerEntries: appendLedger(newLedgerEntry('Reassigned', 'LOB Manager · You', `→ ${next}`)),
     });
     toast.success(`${row.id} reassigned to ${next}`);
   };
   const onEscalate = () => {
-    mutateRow(row.id, { resolutionStatus: 'Escalated to HOD', stateFlags: row.stateFlags.concat('Escalated') });
+    mutateRow(row.id, {
+      resolutionStatus: 'Escalated to HOD',
+      stateFlags: row.stateFlags.concat('Escalated'),
+      ledgerEntries: appendLedger(newLedgerEntry('Escalated to HOD', 'LOB Manager · You')),
+    });
     toast.success(`Escalated to HOD`);
   };
   const onExport = () => toast.success(`Regulatory audit exported · hash: ${row.auditLedgerId}`);
+
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-8 overflow-y-auto">
@@ -274,7 +323,30 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           </div>
         )}
 
+        {/* Immutable Ledger */}
+        {row.ledgerEntries.length > 0 && (
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
+              <Lock className="h-3 w-3" /> Immutable Audit Ledger ({row.ledgerEntries.length})
+            </h3>
+            <div className="space-y-1 max-h-[180px] overflow-y-auto scrollbar-thin">
+              {row.ledgerEntries.map((l, i) => (
+                <div key={i} className="text-[10px] font-mono px-2 py-1 rounded bg-secondary/40 border border-border/50">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-foreground">{new Date(l.timestamp).toLocaleString()}</span>
+                    <span className="text-primary font-semibold">{l.action}</span>
+                    <span className="text-muted-foreground">· {l.actor}</span>
+                    <span className="ml-auto text-muted-foreground">{l.hash}</span>
+                  </div>
+                  {l.details && <div className="text-muted-foreground mt-0.5 font-sans">{l.details}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Role-gated actions */}
+
         <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center gap-2 flex-wrap rounded-b-lg">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mr-1">Actions</span>
           {actions.includes('acknowledge') && (
@@ -284,7 +356,9 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
             <ActionBtn icon={Wrench} label="Deploy Resolution" onClick={onDeploy} variant="primary" />
           )}
           {actions.includes('tagDependency') && (
-            <ActionBtn icon={GitFork} label="Tag Multi-Team Dependency" onClick={onTagDep} />
+            row.dependency
+              ? <ActionBtn icon={GitFork} label="Disable Multi-Team Dependency" onClick={openDisableDep} variant="amber" />
+              : <ActionBtn icon={GitFork} label="Enable Multi-Team Dependency"  onClick={openEnableDep} />
           )}
           {actions.includes('reassign') && <ActionBtn icon={User} label="Reassign" onClick={onReassign} />}
           {actions.includes('escalate') && <ActionBtn icon={ArrowUpRight} label="Escalate" onClick={onEscalate} variant="amber" />}
@@ -299,6 +373,89 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Multi-Team Dependency toggle modal */}
+      {depModal && (
+        <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDepModal(null)}>
+          <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <GitFork className="h-4 w-4 text-chart-5" />
+                {depModal.mode === 'enable' ? 'Enable Multi-Team Dependency' : 'Disable Multi-Team Dependency'}
+              </h3>
+              <button onClick={() => setDepModal(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+            </div>
+
+            {depModal.mode === 'enable' && depModal.step === 'form' && (
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Notify Team</label>
+                  <select
+                    value={depModal.team}
+                    onChange={(e) => setDepModal({ ...depModal, team: e.target.value })}
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  >
+                    {DEPENDENCY_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reason (optional)</label>
+                  <input
+                    value={depModal.reason}
+                    onChange={(e) => setDepModal({ ...depModal, reason: e.target.value })}
+                    placeholder="e.g. upstream firewall rule blocking traffic"
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button onClick={() => setDepModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
+                  <button
+                    onClick={() => setDepModal({ ...depModal, step: 'confirm' })}
+                    className="text-[11px] px-3 py-1 rounded border bg-primary/15 border-primary/40 text-primary font-semibold hover:bg-primary/25"
+                  >Next →</button>
+                </div>
+              </div>
+            )}
+
+            {depModal.step === 'confirm' && (
+              <div className="p-4 space-y-3">
+                <div className="flex items-start gap-2 p-3 rounded border border-rag-amber bg-rag-amber">
+                  <AlertTriangle className="h-4 w-4 rag-amber shrink-0 mt-0.5" />
+                  <div className="text-[11px]">
+                    <div className="font-semibold text-foreground mb-1">Are you sure?</div>
+                    {depModal.mode === 'enable' ? (
+                      <div className="text-muted-foreground">
+                        This will <span className="text-foreground font-semibold">notify {depModal.team}</span> and <span className="text-foreground font-semibold">pause the primary SLA timer</span>. This action will be written to the immutable audit ledger.
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground">
+                        This will <span className="text-foreground font-semibold">de-notify {row.dependency?.team}</span> and <span className="text-foreground font-semibold">resume the primary SLA timer</span>. This action will be written to the immutable audit ledger.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => depModal.mode === 'enable' ? setDepModal({ ...depModal, step: 'form' }) : setDepModal(null)}
+                    className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent"
+                  >Cancel</button>
+                  <button
+                    onClick={() => depModal.mode === 'enable' ? commitEnableDep(depModal.team, depModal.reason) : commitDisableDep()}
+                    className={cn(
+                      'text-[11px] px-3 py-1 rounded border font-semibold flex items-center gap-1',
+                      depModal.mode === 'enable'
+                        ? 'bg-primary/15 border-primary/40 text-primary hover:bg-primary/25'
+                        : 'bg-rag-amber border-rag-amber rag-amber hover:opacity-80',
+                    )}
+                  >
+                    <Lock className="h-3 w-3" /> Confirm &amp; Ledger
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -376,7 +533,7 @@ function GroupDrilldown({ type, value, rows, onClose, onSelectBreach }: {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
               <XAxis type="number" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 8, fill: 'hsl(215 15% 50%)' }} width={100} />
-              <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+              <Tooltip {...CHART_TOOLTIP} />
               <Bar dataKey="breaches" radius={[0, 2, 2, 0]}>
                 {breakdownData.map((_, i) => <Cell key={i} fill={i === 0 ? 'hsl(0 72% 51%)' : 'hsl(38 92% 50%)'} />)}
               </Bar>

@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend, Cell } from 'recharts';
-import { TrendingUp, BarChart3, Calendar } from 'lucide-react';
+import { TrendingUp, BarChart3, Calendar, Phone, Mail } from 'lucide-react';
+import { CHART_TOOLTIP } from '@/lib/utils';
+import { SYSTEM_SPOC_MAP } from '@/lib/mockData';
 
 const LOB_COLORS: Record<string, string> = {
   B2B: 'hsl(210 100% 56%)',
@@ -63,7 +65,7 @@ export function AnalystView() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
             <XAxis dataKey="month" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
             <YAxis tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} unit="%" domain={['dataMin - 1', 100]} />
-            <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+            <Tooltip {...CHART_TOOLTIP} />
             <Legend wrapperStyle={{ fontSize: 10 }} />
             {lobs.map(lob => (
               <Line key={lob} type="monotone" dataKey={lob} stroke={LOB_COLORS[lob] || 'hsl(0 72% 51%)'} strokeWidth={1.8} dot={{ r: 3 }} />
@@ -79,12 +81,42 @@ export function AnalystView() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
             <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
             <YAxis tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
-            <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+            <Tooltip {...CHART_TOOLTIP} />
             <Bar dataKey="breaches">
               {breachBySystem.map((_, i) => <Cell key={i} fill={i < 2 ? 'hsl(0 72% 51%)' : 'hsl(38 92% 50%)'} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* SPOC contact directory — Analyst can request details but cannot see malfunction history */}
+      <div className="bg-card border border-border rounded-md">
+        <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System SPOC Directory</h3>
+          <span className="text-[10px] text-muted-foreground ml-2 italic">For incident-level details, contact the relevant System SPOC. Analyst role does not have access to malfunction history.</span>
+        </div>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-border text-[10px] text-muted-foreground">
+              <th className="text-left px-3 py-1.5 font-medium">System</th>
+              <th className="text-left px-3 py-1.5 font-medium">SPOC</th>
+              <th className="text-left px-3 py-1.5 font-medium">Role</th>
+              <th className="text-left px-3 py-1.5 font-medium">Email</th>
+              <th className="text-left px-3 py-1.5 font-medium">Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(SYSTEM_SPOC_MAP).map(([sys, s]) => (
+              <tr key={sys} className="border-b border-border/50 hover:bg-accent/20">
+                <td className="px-3 py-1.5 font-semibold text-foreground">{sys}</td>
+                <td className="px-3 py-1.5">{s.name}</td>
+                <td className="px-3 py-1.5 text-muted-foreground">{s.role}</td>
+                <td className="px-3 py-1.5 font-mono text-[10px] flex items-center gap-1"><Mail className="h-3 w-3 text-muted-foreground" />{s.email}</td>
+                <td className="px-3 py-1.5 font-mono text-[10px]"><span className="flex items-center gap-1"><Phone className="h-3 w-3 text-muted-foreground" />{s.phone}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
