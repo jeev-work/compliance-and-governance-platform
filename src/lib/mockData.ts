@@ -46,6 +46,7 @@ export type EscalationEntry = { from: string; to: string; timestamp: string; rea
 export type CommentEntry = { author: string; role: string; timestamp: string; text: string };
 export type ChaseEvent = { step: ChaseStep; timestamp: string; actor: string };
 export type DependencyFork = { team: string; timestamp: string; linkedId: string; status: 'open' | 'resolved' };
+export type LedgerEntry = { timestamp: string; actor: string; action: string; hash: string; details?: string };
 
 export type KPIRow = {
   id: string;
