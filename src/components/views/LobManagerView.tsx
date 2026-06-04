@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
 import { Users, AlertCircle, ArrowUpRight, GitFork, Clock, Flag } from 'lucide-react';
-import { RagState } from '@/lib/mockData';
+import type { RagState } from '@/lib/mockData';
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green border-rag-green',
@@ -81,17 +81,18 @@ export function LobManagerView() {
                   {matrix.procs.map(p => {
                     const c = matrix.cell(s, p);
                     if (!c) return <td key={p} className="p-1"><div className="h-7 rounded border border-dashed border-border" /></td>;
+                    const w: RagState = c.worst;
                     return (
                       <td key={p} className="p-1">
                         <div className={cn(
                           'rounded border px-1.5 py-1 text-center cursor-pointer hover:ring-1 hover:ring-primary/50 transition-all',
-                          RAG_BG[c.worst],
+                          RAG_BG[w],
                           c.exec > 0 && 'exec-pulse',
                         )}>
                           <div className={cn('font-bold font-mono text-[9px]',
-                            c.worst === 'RED' ? 'rag-red' : c.worst === 'AMBER' ? 'rag-amber' :
-                            c.worst === 'GREY' ? 'rag-grey' : c.worst === 'BLUE' ? 'rag-blue' : 'rag-green')}>
-                            {c.worst.slice(0, 3)}
+                            w === 'RED' ? 'rag-red' : w === 'AMBER' ? 'rag-amber' :
+                            w === 'GREY' ? 'rag-grey' : w === 'BLUE' ? 'rag-blue' : 'rag-green')}>
+                            {w.slice(0, 3)}
                           </div>
                           <div className="text-muted-foreground text-[9px]">{c.breaches > 0 ? `${c.breaches} br` : '—'}</div>
                         </div>
@@ -121,7 +122,7 @@ export function LobManagerView() {
                   <span className="font-mono font-semibold text-foreground">{r.id}</span>
                   {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                   {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
-                  {r.stateFlags.includes('Unacknowledged') && <AlertCircle className="h-3 w-3 rag-amber" title="Unacknowledged by SPOC" />}
+                  {r.stateFlags.includes('Unacknowledged') && <span title="Unacknowledged by SPOC"><AlertCircle className="h-3 w-3 rag-amber" /></span>}
                 </div>
                 <div className="text-muted-foreground mt-0.5">{r.system} · {r.process}</div>
                 <div className="flex items-center justify-between mt-0.5">
