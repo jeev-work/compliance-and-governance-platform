@@ -1,191 +1,275 @@
-// Robust mock data generator for 30,000 KPI rows with full audit trail
+// Governance KPI mock data — 5-state RAG, LoB, full incident lifecycle.
+// Models the patterns described in Solution Blueprint §2 and Conceptual Design §3.3/§4.1.
 
-const DEPARTMENTS = ['Operations', 'Tech', 'Finance', 'Compliance', 'HR', 'Customer Service'];
-const SYSTEMS = ['Core Banking', 'Payment Gateway', 'CRM', 'Document Cloud', 'Data Warehouse', 'Auth Engine'];
-const PROCESSES = ['KYC Verification', 'API Uptime', 'Ledger Sync', 'AML Screening', 'Ticket Routing', 'DB Backup'];
+export const LOBS = ['B2B', 'B2C', 'Wheels'] as const;
+export type LoB = typeof LOBS[number];
+
+const SYSTEMS = ['Core Banking', 'Payment Gateway', 'CRM', 'Document Cloud', 'Data Warehouse', 'Auth Engine'] as const;
+const PROCESSES = ['KYC Verification', 'API Uptime', 'Ledger Sync', 'AML Screening', 'Ticket Routing', 'DB Backup'] as const;
+const SOURCES = ['AppDynamics', 'Datadog', 'Splunk', 'New Relic'] as const;
+
 const ASSIGNEES = [
-  { name: 'J. Chen', role: 'Sr. Engineer', dept: 'Tech' },
-  { name: 'M. Patel', role: 'Compliance Lead', dept: 'Compliance' },
-  { name: 'S. Kumar', role: 'DevOps Manager', dept: 'Operations' },
-  { name: 'A. Williams', role: 'Risk Analyst', dept: 'Finance' },
-  { name: 'R. Thompson', role: 'IT Support Lead', dept: 'Tech' },
-  { name: 'K. Garcia', role: 'Security Architect', dept: 'Tech' },
-  { name: 'L. Zhang', role: 'VP Engineering', dept: 'Tech' },
-  { name: 'D. Okafor', role: 'Head of Compliance', dept: 'Compliance' },
-  { name: 'P. Novak', role: 'CTO', dept: 'Tech' },
-  { name: 'E. Santos', role: 'Audit Manager', dept: 'Finance' },
+  { name: 'J. Chen', role: 'Sr. Engineer' },
+  { name: 'M. Patel', role: 'Compliance Lead' },
+  { name: 'S. Kumar', role: 'DevOps Manager' },
+  { name: 'A. Williams', role: 'Risk Analyst' },
+  { name: 'R. Thompson', role: 'IT Support Lead' },
+  { name: 'K. Garcia', role: 'Security Architect' },
+  { name: 'L. Zhang', role: 'VP Engineering' },
+  { name: 'D. Okafor', role: 'Head of Compliance' },
+  { name: 'P. Novak', role: 'CTO' },
+  { name: 'E. Santos', role: 'Audit Manager' },
 ];
 
-const RESOLUTION_STATUSES = ['Investigating', 'Open', 'Escalated to HOD', 'Resolved'] as const;
-
-const COMMENT_TEMPLATES = [
-  'Initial triage completed. Root cause appears to be {cause}.',
-  'Monitoring ongoing. No further escalation needed at this time.',
-  'Escalated to {person} for review. High priority.',
-  'Patch deployed in staging. Awaiting production rollout.',
-  'Confirmed resolution. Post-mortem scheduled for next sprint.',
-  'SLA breach confirmed. Initiating remediation protocol.',
-  'Vendor notified. ETA for fix: {hours}h.',
-  'Rollback initiated. Investigating regression in {system}.',
-  'Duplicate of KPI-{id}. Linking incidents.',
-  'Security review completed. No data exposure confirmed.',
+const CAUSES = [
+  'timeout in upstream service', 'database connection pool exhaustion',
+  'certificate expiry', 'API rate limiting', 'memory leak in worker process',
+  'misconfigured firewall rule', 'stale cache invalidation', 'disk I/O saturation',
 ];
 
-const CAUSES = ['timeout in upstream service', 'database connection pool exhaustion', 'certificate expiry', 'API rate limiting', 'memory leak in worker process', 'misconfigured firewall rule', 'stale cache invalidation', 'disk I/O saturation'];
+const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Security Eng', 'Cloud Platform'];
 
-export type EscalationEntry = {
-  from: string;
-  to: string;
-  timestamp: string;
-  reason: string;
-};
+/** Five-state governance status per Blueprint §1 Layer 3 */
+export type RagState = 'GREEN' | 'AMBER' | 'RED' | 'GREY' | 'BLUE' | 'UNCONFIGURED';
 
-export type CommentEntry = {
-  author: string;
-  role: string;
-  timestamp: string;
-  text: string;
-};
+/** Operational state flags exposed in the universal filter ribbon */
+export type StateFlag =
+  | 'Acknowledged' | 'Unacknowledged' | 'Escalated'
+  | 'Cross-Functional' | 'Verifying' | 'Unconfigured';
+
+export type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
+
+export type ChaseStep =
+  | 'Generated' | 'Notified' | 'Acknowledged' | 'Resolved' | 'Verifying' | 'Closed';
+
+export type EscalationEntry = { from: string; to: string; timestamp: string; reason: string };
+export type CommentEntry = { author: string; role: string; timestamp: string; text: string };
+export type ChaseEvent = { step: ChaseStep; timestamp: string; actor: string };
+export type DependencyFork = { team: string; timestamp: string; linkedId: string; status: 'open' | 'resolved' };
 
 export type KPIRow = {
   id: string;
-  date: string;
-  department: string;
+  date: string;            // ISO date
+  timestamp: string;       // ISO timestamp (hourly granularity for date picker)
+  lob: LoB;
   system: string;
   process: string;
+  source: string;          // monitoring source — used by Admin Health Console
   baseVolume: number;
   breaches: number;
   failureRate: number;
   targetSLA: number;
+  slaVersion: string;      // SLA Configuration Vault version (Blueprint §1 Layer 3)
+  ragState: RagState;
   status: 'BREACHED' | 'CLEAN';
-  resolutionStatus: 'Clean' | 'Investigating' | 'Open' | 'Escalated to HOD' | 'Resolved';
-  assignee: typeof ASSIGNEES[number] | null;
+  resolutionStatus: 'Clean' | 'Investigating' | 'Open' | 'Escalated to HOD' | 'Resolved' | 'Verifying';
+  stateFlags: StateFlag[];
+  assignee: { name: string; role: string } | null;
   escalations: EscalationEntry[];
   comments: CommentEntry[];
+  chaseTimeline: ChaseEvent[];
+  dependency: DependencyFork | null;
+  executiveFlag: boolean;       // Solution Blueprint §2 Exception 4
+  auditLedgerId: string;        // hashed-looking immutable ledger ref
+  maintenanceWindow: string | null;
   timeToDetectMin: number | null;
   timeToEscalateMin: number | null;
   timeToResolveMin: number | null;
   resolvedBy: string | null;
-  severity: 'Critical' | 'High' | 'Medium' | 'Low';
+  severity: Severity;
   riskScore: number;
 };
 
-function seededRandom(seed: number) {
+function seeded(seed: number) {
   let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return s / 2147483647;
-  };
+  return () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
 }
 
-function generateComment(rand: () => number, dateBase: Date, system: string, id: number): CommentEntry {
-  const assignee = ASSIGNEES[Math.floor(rand() * ASSIGNEES.length)];
-  let text = COMMENT_TEMPLATES[Math.floor(rand() * COMMENT_TEMPLATES.length)];
-  text = text.replace('{cause}', CAUSES[Math.floor(rand() * CAUSES.length)]);
-  text = text.replace('{person}', ASSIGNEES[Math.floor(rand() * ASSIGNEES.length)].name);
-  text = text.replace('{hours}', String(Math.floor(rand() * 48) + 1));
-  text = text.replace('{system}', system);
-  text = text.replace('{id}', String(10000 + Math.floor(rand() * 20000)));
+function pick<T>(rand: () => number, arr: readonly T[]): T { return arr[Math.floor(rand() * arr.length)]; }
 
-  const offset = Math.floor(rand() * 72) * 60 * 60 * 1000;
-  const ts = new Date(dateBase.getTime() + offset);
-
-  return { author: assignee.name, role: assignee.role, timestamp: ts.toISOString(), text };
+function fakeHash(rand: () => number, prefix = 'LDG') {
+  let h = '';
+  const chars = 'abcdef0123456789';
+  for (let i = 0; i < 16; i++) h += chars[Math.floor(rand() * chars.length)];
+  return `${prefix}-${h}`;
 }
 
-function generateEscalations(rand: () => number, dateBase: Date, count: number): EscalationEntry[] {
-  const entries: EscalationEntry[] = [];
-  const reasons = ['SLA threshold exceeded', 'No response from assignee', 'Critical system impact', 'Regulatory deadline approaching', 'Multiple related incidents detected'];
-  let currentTime = dateBase.getTime();
+function makeChaseTimeline(rand: () => number, baseTs: Date, resolution: KPIRow['resolutionStatus'], dependency: boolean): ChaseEvent[] {
+  const steps: ChaseStep[] = ['Generated', 'Notified'];
+  if (resolution !== 'Open') steps.push('Acknowledged');
+  if (resolution === 'Resolved') steps.push('Resolved', 'Verifying', 'Closed');
+  else if (resolution === 'Verifying') steps.push('Resolved', 'Verifying');
+  else if (resolution === 'Escalated to HOD') steps.push('Acknowledged');
 
-  for (let i = 0; i < count; i++) {
-    const from = ASSIGNEES[Math.floor(rand() * ASSIGNEES.length)];
-    const to = ASSIGNEES[Math.floor(rand() * ASSIGNEES.length)];
-    currentTime += Math.floor(rand() * 24 * 60) * 60 * 1000;
-    entries.push({
-      from: from.name,
-      to: to.name,
-      timestamp: new Date(currentTime).toISOString(),
-      reason: reasons[Math.floor(rand() * reasons.length)],
-    });
-  }
-  return entries;
+  let t = baseTs.getTime();
+  const events: ChaseEvent[] = [];
+  steps.forEach((step, i) => {
+    t += Math.floor(rand() * 30 + 5) * 60 * 1000;
+    const actor = i === 0 ? 'System' : i === 1 ? 'Notifier Bot' : ASSIGNEES[Math.floor(rand() * ASSIGNEES.length)].name;
+    events.push({ step, timestamp: new Date(t).toISOString(), actor: dependency && step === 'Acknowledged' ? `${actor} (+dependency fork)` : actor });
+  });
+  return events;
+}
+
+function pickRagState(rand: () => number): RagState {
+  const r = rand();
+  if (r < 0.78) return 'GREEN';
+  if (r < 0.87) return 'AMBER';
+  if (r < 0.93) return 'RED';
+  if (r < 0.95) return 'GREY';
+  if (r < 0.99) return 'BLUE';
+  return 'UNCONFIGURED';
 }
 
 export function generateMockData(count = 30000): KPIRow[] {
-  const rand = seededRandom(42);
+  const rand = seeded(42);
   const rows: KPIRow[] = [];
-  const baseDate = new Date(2026, 3, 14); // April 14, 2026
+  const baseDate = new Date(2026, 4, 14); // May 14, 2026
+
+  // Pre-seed a Grey connector outage cluster (Blueprint §2 Exception 1)
+  const greyOutageStart = new Date(baseDate.getTime() - 2 * 86400000);
+  const greyOutageSystem = 'Payment Gateway';
+
+  // Pre-seed a Blue maintenance window (Blueprint §2 / Layer 3 Blue state)
+  const maintenanceWindowLabel = 'Core Banking quarterly patch — Sat 02:00–06:00';
 
   for (let i = 0; i < count; i++) {
-    const daysAgo = Math.floor(rand() * 90);
-    const date = new Date(baseDate.getTime() - daysAgo * 86400000);
+    const hoursAgo = Math.floor(rand() * 90 * 24);
+    const ts = new Date(baseDate.getTime() - hoursAgo * 3600000);
+    const date = ts.toISOString().split('T')[0];
+    const system = pick(rand, SYSTEMS);
+    const process = pick(rand, PROCESSES);
+    const source = pick(rand, SOURCES);
+    const lob = pick(rand, LOBS);
+
+    let ragState = pickRagState(rand);
+
+    // Cluster the Grey outage on a specific system + window
+    const inOutageWindow = Math.abs(ts.getTime() - greyOutageStart.getTime()) < 6 * 3600000;
+    if (system === greyOutageSystem && inOutageWindow && rand() < 0.45) ragState = 'GREY';
+
+    // Cluster Blue maintenance on Core Banking on Saturdays 02:00–06:00 UTC
+    const isMaintWindow =
+      system === 'Core Banking' && ts.getUTCDay() === 6 && ts.getUTCHours() >= 2 && ts.getUTCHours() < 6;
+    if (isMaintWindow) ragState = 'BLUE';
+
     const baseVolume = Math.floor(rand() * 500000) + 1000;
-    const breaches = rand() > 0.2 ? 0 : Math.floor(rand() * 1500) + 1;
+    let breaches = 0;
+    if (ragState === 'AMBER') breaches = Math.floor(rand() * 50) + 1;
+    else if (ragState === 'RED') breaches = Math.floor(rand() * 1500) + 50;
     const failureRate = breaches === 0 ? 0 : parseFloat(((breaches / baseVolume) * 100).toFixed(4));
-    const status: KPIRow['status'] = breaches > 0 ? 'BREACHED' : 'CLEAN';
-    const system = SYSTEMS[Math.floor(rand() * SYSTEMS.length)];
+    const status: KPIRow['status'] = ragState === 'RED' || ragState === 'AMBER' ? 'BREACHED' : 'CLEAN';
+
+    let severity: Severity = 'Low';
+    if (ragState === 'RED') severity = failureRate > 1 ? 'Critical' : failureRate > 0.5 ? 'High' : 'Medium';
+    else if (ragState === 'AMBER') severity = 'Medium';
+
+    const riskScore = ragState === 'RED' ? Math.min(100, Math.round(40 + failureRate * 20))
+                    : ragState === 'AMBER' ? Math.round(20 + failureRate * 10)
+                    : ragState === 'GREY' ? 60 : 0;
 
     let resolutionStatus: KPIRow['resolutionStatus'] = 'Clean';
     let assignee: KPIRow['assignee'] = null;
     let escalations: EscalationEntry[] = [];
     let comments: CommentEntry[] = [];
+    let dependency: DependencyFork | null = null;
+    let executiveFlag = false;
     let timeToDetectMin: number | null = null;
     let timeToEscalateMin: number | null = null;
     let timeToResolveMin: number | null = null;
     let resolvedBy: string | null = null;
-    let severity: KPIRow['severity'] = 'Low';
-    let riskScore = 0;
 
-    if (breaches > 0) {
-      resolutionStatus = RESOLUTION_STATUSES[Math.floor(rand() * 4)];
-      assignee = ASSIGNEES[Math.floor(rand() * ASSIGNEES.length)];
+    const stateFlags: StateFlag[] = [];
+
+    if (status === 'BREACHED') {
+      const r = rand();
+      resolutionStatus = r < 0.35 ? 'Resolved' : r < 0.55 ? 'Verifying' : r < 0.75 ? 'Investigating' : r < 0.9 ? 'Escalated to HOD' : 'Open';
+      assignee = pick(rand, ASSIGNEES);
       timeToDetectMin = Math.floor(rand() * 120) + 1;
 
-      // Severity based on failure rate
-      if (failureRate > 1) severity = 'Critical';
-      else if (failureRate > 0.5) severity = 'High';
-      else if (failureRate > 0.1) severity = 'Medium';
-      else severity = 'Low';
+      if (resolutionStatus === 'Resolved' || resolutionStatus === 'Verifying') {
+        timeToResolveMin = Math.floor(rand() * 2880) + 30;
+        resolvedBy = pick(rand, ASSIGNEES).name;
+      }
+      if (resolutionStatus === 'Escalated to HOD') timeToEscalateMin = Math.floor(rand() * 480) + 15;
 
-      // Risk score (0-100)
-      riskScore = Math.min(100, Math.round(failureRate * 20 + breaches * 0.05 + (severity === 'Critical' ? 40 : severity === 'High' ? 25 : severity === 'Medium' ? 10 : 0)));
+      // Acknowledged vs Unacknowledged
+      stateFlags.push(resolutionStatus === 'Open' ? 'Unacknowledged' : 'Acknowledged');
+      if (resolutionStatus === 'Escalated to HOD') stateFlags.push('Escalated');
+      if (resolutionStatus === 'Verifying') stateFlags.push('Verifying');
+
+      // ~2% of Red get cross-functional dependency forks
+      if (ragState === 'RED' && rand() < 0.18) {
+        dependency = {
+          team: pick(rand, DEPENDENCY_TEAMS),
+          timestamp: new Date(ts.getTime() + 45 * 60000).toISOString(),
+          linkedId: `SUB-${10000 + Math.floor(rand() * 20000)}`,
+          status: rand() < 0.5 ? 'open' : 'resolved',
+        };
+        stateFlags.push('Cross-Functional');
+      }
+
+      // ~0.5% of Red get Executive Flag stamp
+      if (ragState === 'RED' && rand() < 0.05) {
+        executiveFlag = true;
+        stateFlags.push('Escalated');
+      }
 
       // Escalations
-      const numEscalations = resolutionStatus === 'Escalated to HOD' ? Math.floor(rand() * 3) + 2 : resolutionStatus === 'Resolved' ? Math.floor(rand() * 2) + 1 : Math.floor(rand() * 2);
-      escalations = generateEscalations(rand, date, numEscalations);
-      if (numEscalations > 0) {
-        timeToEscalateMin = Math.floor(rand() * 480) + 15;
+      const numEsc = resolutionStatus === 'Escalated to HOD' ? Math.floor(rand() * 3) + 2 : Math.floor(rand() * 2);
+      for (let e = 0; e < numEsc; e++) {
+        const from = pick(rand, ASSIGNEES), to = pick(rand, ASSIGNEES);
+        escalations.push({
+          from: from.name, to: to.name,
+          timestamp: new Date(ts.getTime() + (e + 1) * 30 * 60000).toISOString(),
+          reason: pick(rand, ['SLA threshold exceeded', 'No response from assignee', 'Critical system impact', 'Regulatory deadline approaching']),
+        });
       }
 
       // Comments
-      const numComments = Math.floor(rand() * 5) + 1;
-      for (let c = 0; c < numComments; c++) {
-        comments.push(generateComment(rand, date, system, i));
+      const numCm = Math.floor(rand() * 4) + 1;
+      for (let c = 0; c < numCm; c++) {
+        const a = pick(rand, ASSIGNEES);
+        comments.push({
+          author: a.name, role: a.role,
+          timestamp: new Date(ts.getTime() + c * 45 * 60000).toISOString(),
+          text: `Initial triage completed. Root cause appears to be ${pick(rand, CAUSES)}.`,
+        });
       }
-      comments.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-
-      if (resolutionStatus === 'Resolved') {
-        timeToResolveMin = Math.floor(rand() * 2880) + 30; // 30min to 48h
-        resolvedBy = ASSIGNEES[Math.floor(rand() * ASSIGNEES.length)].name;
-      }
+    } else if (ragState === 'UNCONFIGURED') {
+      stateFlags.push('Unconfigured');
     }
+
+    const slaVersion = `SLA_v1.${Math.floor(rand() * 4)}`;
+    const chaseTimeline = status === 'BREACHED'
+      ? makeChaseTimeline(rand, ts, resolutionStatus, !!dependency)
+      : [];
 
     rows.push({
       id: `KPI-${10000 + i}`,
-      date: date.toISOString().split('T')[0],
-      department: DEPARTMENTS[Math.floor(rand() * DEPARTMENTS.length)],
+      date,
+      timestamp: ts.toISOString(),
+      lob,
       system,
-      process: PROCESSES[Math.floor(rand() * PROCESSES.length)],
+      process,
+      source,
       baseVolume,
       breaches,
       failureRate,
       targetSLA: 0.05,
+      slaVersion,
+      ragState,
       status,
       resolutionStatus,
+      stateFlags,
       assignee,
       escalations,
       comments,
+      chaseTimeline,
+      dependency,
+      executiveFlag,
+      auditLedgerId: fakeHash(rand),
+      maintenanceWindow: ragState === 'BLUE' ? maintenanceWindowLabel : null,
       timeToDetectMin,
       timeToEscalateMin,
       timeToResolveMin,
@@ -195,7 +279,15 @@ export function generateMockData(count = 30000): KPIRow[] {
     });
   }
 
-  return rows.sort((a, b) => b.date.localeCompare(a.date));
+  return rows.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
-export const FILTER_OPTIONS = { DEPARTMENTS, SYSTEMS, PROCESSES };
+export const FILTER_OPTIONS = {
+  LOBS: [...LOBS],
+  SYSTEMS: [...SYSTEMS],
+  PROCESSES: [...PROCESSES],
+  SOURCES: [...SOURCES],
+  RAG_STATES: ['GREEN', 'AMBER', 'RED', 'GREY', 'BLUE', 'UNCONFIGURED'] as RagState[],
+  SEVERITIES: ['Critical', 'High', 'Medium', 'Low'] as Severity[],
+  STATE_FLAGS: ['Acknowledged', 'Unacknowledged', 'Escalated', 'Cross-Functional', 'Verifying', 'Unconfigured'] as StateFlag[],
+};
