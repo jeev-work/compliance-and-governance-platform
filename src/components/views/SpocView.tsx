@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useFilters } from '@/lib/filterContext';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils'; import { CHART_TOOLTIP } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { ChevronUp, ChevronDown, Inbox, Wrench, GitFork, ShieldAlert } from 'lucide-react';
 import { RagState } from '@/lib/mockData';
