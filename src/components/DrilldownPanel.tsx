@@ -323,7 +323,30 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           </div>
         )}
 
+        {/* Immutable Ledger */}
+        {row.ledgerEntries.length > 0 && (
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
+              <Lock className="h-3 w-3" /> Immutable Audit Ledger ({row.ledgerEntries.length})
+            </h3>
+            <div className="space-y-1 max-h-[180px] overflow-y-auto scrollbar-thin">
+              {row.ledgerEntries.map((l, i) => (
+                <div key={i} className="text-[10px] font-mono px-2 py-1 rounded bg-secondary/40 border border-border/50">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-foreground">{new Date(l.timestamp).toLocaleString()}</span>
+                    <span className="text-primary font-semibold">{l.action}</span>
+                    <span className="text-muted-foreground">· {l.actor}</span>
+                    <span className="ml-auto text-muted-foreground">{l.hash}</span>
+                  </div>
+                  {l.details && <div className="text-muted-foreground mt-0.5 font-sans">{l.details}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Role-gated actions */}
+
         <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center gap-2 flex-wrap rounded-b-lg">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mr-1">Actions</span>
           {actions.includes('acknowledge') && (
