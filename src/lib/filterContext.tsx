@@ -25,11 +25,17 @@ type DrilldownState = {
   row: KPIRow | null;
 };
 
+export type HistoryView = {
+  pivot: KPIRow;
+  rows: KPIRow[]; // all rows sharing (system, process, lob), sorted asc by timestamp
+} | null;
+
 type Ctx = {
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
   filteredData: KPIRow[];
   allData: KPIRow[];
+  historyView: HistoryView;
   drilldown: DrilldownState;
   openDrilldown: (type: DrilldownState['type'], value: string | null, row?: KPIRow | null) => void;
   closeDrilldown: () => void;
