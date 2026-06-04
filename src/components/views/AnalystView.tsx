@@ -88,6 +88,36 @@ export function AnalystView() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* SPOC contact directory — Analyst can request details but cannot see malfunction history */}
+      <div className="bg-card border border-border rounded-md">
+        <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System SPOC Directory</h3>
+          <span className="text-[10px] text-muted-foreground ml-2 italic">For incident-level details, contact the relevant System SPOC. Analyst role does not have access to malfunction history.</span>
+        </div>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-border text-[10px] text-muted-foreground">
+              <th className="text-left px-3 py-1.5 font-medium">System</th>
+              <th className="text-left px-3 py-1.5 font-medium">SPOC</th>
+              <th className="text-left px-3 py-1.5 font-medium">Role</th>
+              <th className="text-left px-3 py-1.5 font-medium">Email</th>
+              <th className="text-left px-3 py-1.5 font-medium">Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(SYSTEM_SPOC_MAP).map(([sys, s]) => (
+              <tr key={sys} className="border-b border-border/50 hover:bg-accent/20">
+                <td className="px-3 py-1.5 font-semibold text-foreground">{sys}</td>
+                <td className="px-3 py-1.5">{s.name}</td>
+                <td className="px-3 py-1.5 text-muted-foreground">{s.role}</td>
+                <td className="px-3 py-1.5 font-mono text-[10px] flex items-center gap-1"><Mail className="h-3 w-3 text-muted-foreground" />{s.email}</td>
+                <td className="px-3 py-1.5 font-mono text-[10px]"><span className="flex items-center gap-1"><Phone className="h-3 w-3 text-muted-foreground" />{s.phone}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
