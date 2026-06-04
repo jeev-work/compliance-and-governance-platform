@@ -1,14 +1,23 @@
 import { useFilters } from '@/lib/filterContext';
-import { ChaseStep, KPIRow, RagState } from '@/lib/mockData';
+import { ChaseStep, KPIRow, RagState, LedgerEntry } from '@/lib/mockData';
 import { ROLE_ACTIONS } from '@/lib/rbac';
-import { cn } from '@/lib/utils';
+import { cn, CHART_TOOLTIP } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert,
+  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock,
 } from 'lucide-react';
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
+
+const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Security Eng', 'Cloud Platform'];
+
+function newLedgerEntry(action: string, actor: string, details?: string): LedgerEntry {
+  const hex = 'abcdef0123456789';
+  let h = '';
+  for (let i = 0; i < 16; i++) h += hex[Math.floor(Math.random() * 16)];
+  return { timestamp: new Date().toISOString(), actor, action, hash: `LDG-${h}`, details };
+}
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green rag-green',
