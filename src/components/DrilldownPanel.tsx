@@ -49,13 +49,19 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
   const { filters, mutateRow } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
+  // Dependency toggle modal state
+  const [depModal, setDepModal] = useState<null | { mode: 'enable' | 'disable'; team: string; reason: string; step: 'form' | 'confirm' }>(null);
+
   const fmt = (m: number | null) => !m ? '—' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+
+  const appendLedger = (entry: LedgerEntry) => [...row.ledgerEntries, entry];
 
   const onAcknowledge = () => {
     mutateRow(row.id, {
       resolutionStatus: 'Investigating',
       stateFlags: row.stateFlags.filter(f => f !== 'Unacknowledged').concat('Acknowledged'),
       chaseTimeline: [...row.chaseTimeline, { step: 'Acknowledged', timestamp: new Date().toISOString(), actor: 'You' }],
+      ledgerEntries: appendLedger(newLedgerEntry('Acknowledged', 'SPOC · You', 'Chase timer halted')),
     });
     toast.success(`${row.id} acknowledged — chase timer halted`);
   };
@@ -71,6 +77,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
         { step: 'Resolved', timestamp: now, actor: 'You' },
         { step: 'Verifying', timestamp: now, actor: 'System' },
       ],
+      ledgerEntries: appendLedger(newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification')),
     });
     toast.success(`Deploy Resolution sent — verifying telemetry (3s)…`);
 
@@ -91,23 +98,50 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           { step: 'Verifying', timestamp: now, actor: 'System' },
           { step: 'Closed', timestamp: closedAt, actor: 'System' },
         ],
+        ledgerEntries: [
+          ...row.ledgerEntries,
+          newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification'),
+          newLedgerEntry('Verified & Closed', 'System · Telemetry', 'RAG returned to GREEN'),
+        ],
       });
       toast.success(`${row.id} verified & closed — RAG back to GREEN`);
     }, 3000);
   };
-  const onTagDep = () => {
+
+  const openEnableDep  = () => setDepModal({ mode: 'enable',  team: DEPENDENCY_TEAMS[0], reason: '', step: 'form' });
+  const openDisableDep = () => setDepModal({ mode: 'disable', team: row.dependency?.team ?? '', reason: '', step: 'confirm' });
+
+  const commitEnableDep = (team: string, reason: string) => {
+    const ts = new Date().toISOString();
     mutateRow(row.id, {
-      dependency: { team: 'Network Ops', timestamp: new Date().toISOString(), linkedId: `SUB-${Math.floor(Math.random() * 99999)}`, status: 'open' },
-      stateFlags: row.stateFlags.concat('Cross-Functional'),
+      dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open' },
+      stateFlags: row.stateFlags.filter(f => f !== 'Cross-Functional').concat('Cross-Functional'),
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${team}` }],
+      ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency ENABLED', 'SPOC · You', `Notified ${team}${reason ? ` · ${reason}` : ''} · primary SLA timer paused`)),
     });
-    toast.success(`Forked to Network Ops — primary SLA timer paused`);
+    setDepModal(null);
+    toast.success(`Multi-team dependency ENABLED → ${team} notified · ledgered`);
   };
+  const commitDisableDep = () => {
+    const ts = new Date().toISOString();
+    const prevTeam = row.dependency?.team ?? 'unknown';
+    mutateRow(row.id, {
+      dependency: null,
+      stateFlags: row.stateFlags.filter(f => f !== 'Cross-Functional'),
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency cleared (${prevTeam})` }],
+      ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency DISABLED', 'SPOC · You', `${prevTeam} de-notified · primary SLA timer resumed`)),
+    });
+    setDepModal(null);
+    toast.success(`Multi-team dependency DISABLED · ledgered`);
+  };
+
   const onExec = () => {
     mutateRow(row.id, {
       executiveFlag: true,
       ragState: 'RED',
       resolutionStatus: 'Escalated to HOD',
       stateFlags: row.stateFlags.concat('Escalated'),
+      ledgerEntries: appendLedger(newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation')),
     });
     toast.error(`EXECUTIVE FLAG raised — SLA timer nullified, Level 2 escalation`);
   };
@@ -117,14 +151,20 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     mutateRow(row.id, {
       assignee: { name: next, role: 'Sr. Engineer' },
       chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: new Date().toISOString(), actor: `Reassigned → ${next}` }],
+      ledgerEntries: appendLedger(newLedgerEntry('Reassigned', 'LOB Manager · You', `→ ${next}`)),
     });
     toast.success(`${row.id} reassigned to ${next}`);
   };
   const onEscalate = () => {
-    mutateRow(row.id, { resolutionStatus: 'Escalated to HOD', stateFlags: row.stateFlags.concat('Escalated') });
+    mutateRow(row.id, {
+      resolutionStatus: 'Escalated to HOD',
+      stateFlags: row.stateFlags.concat('Escalated'),
+      ledgerEntries: appendLedger(newLedgerEntry('Escalated to HOD', 'LOB Manager · You')),
+    });
     toast.success(`Escalated to HOD`);
   };
   const onExport = () => toast.success(`Regulatory audit exported · hash: ${row.auditLedgerId}`);
+
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-8 overflow-y-auto">
