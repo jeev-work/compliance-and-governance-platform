@@ -288,6 +288,9 @@ export function generateMockData(count = 30000): KPIRow[] {
       resolvedBy,
       severity,
       riskScore,
+      ledgerEntries: [
+        { timestamp: ts.toISOString(), actor: 'System', action: 'KPI Generated', hash: fakeHash(rand, 'LDG'), details: `RAG=${ragState} · sev=${severity}` },
+      ],
     });
   }
 
