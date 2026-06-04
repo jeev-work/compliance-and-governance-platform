@@ -533,7 +533,7 @@ function GroupDrilldown({ type, value, rows, onClose, onSelectBreach }: {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
               <XAxis type="number" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 8, fill: 'hsl(215 15% 50%)' }} width={100} />
-              <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+              <Tooltip {...CHART_TOOLTIP} />
               <Bar dataKey="breaches" radius={[0, 2, 2, 0]}>
                 {breakdownData.map((_, i) => <Cell key={i} fill={i === 0 ? 'hsl(0 72% 51%)' : 'hsl(38 92% 50%)'} />)}
               </Bar>

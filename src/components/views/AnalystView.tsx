@@ -63,7 +63,7 @@ export function AnalystView() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
             <XAxis dataKey="month" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
             <YAxis tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} unit="%" domain={['dataMin - 1', 100]} />
-            <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+            <Tooltip {...CHART_TOOLTIP} />
             <Legend wrapperStyle={{ fontSize: 10 }} />
             {lobs.map(lob => (
               <Line key={lob} type="monotone" dataKey={lob} stroke={LOB_COLORS[lob] || 'hsl(0 72% 51%)'} strokeWidth={1.8} dot={{ r: 3 }} />
@@ -79,7 +79,7 @@ export function AnalystView() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
             <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
             <YAxis tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
-            <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+            <Tooltip {...CHART_TOOLTIP} />
             <Bar dataKey="breaches">
               {breachBySystem.map((_, i) => <Cell key={i} fill={i < 2 ? 'hsl(0 72% 51%)' : 'hsl(38 92% 50%)'} />)}
             </Bar>

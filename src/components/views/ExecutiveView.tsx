@@ -111,7 +111,7 @@ export function ExecutiveView() {
               <Pie data={ragDist} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
                 {ragDist.map((d, i) => <Cell key={i} fill={RAG_HSL[d.name as RagState]} />)}
               </Pie>
-              <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+              <Tooltip {...CHART_TOOLTIP} />
             </PieChart>
           </ResponsiveContainer>
           <div className="grid grid-cols-3 gap-1 mt-2">
@@ -167,7 +167,7 @@ export function ExecutiveView() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
                 <XAxis dataKey="date" tick={{ fontSize: 8, fill: 'hsl(215 15% 50%)' }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} unit="%" />
-                <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+                <Tooltip {...CHART_TOOLTIP} />
                 <Line type="monotone" dataKey="failureRate" stroke="hsl(0 72% 51%)" strokeWidth={1.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -179,7 +179,7 @@ export function ExecutiveView() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 30% 16%)" />
                 <XAxis type="number" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} width={50} />
-                <Tooltip contentStyle={{ background: 'hsl(222 44% 8%)', border: '1px solid hsl(222 30% 16%)', fontSize: 11 }} />
+                <Tooltip {...CHART_TOOLTIP} />
                 <Bar dataKey="breaches" cursor="pointer">
                   {lobBreaches.map((d, i) => <Cell key={i} fill={d.critical > 0 ? 'hsl(0 72% 51%)' : 'hsl(38 92% 50%)'} />)}
                 </Bar>
