@@ -16,6 +16,7 @@ export type FilterState = {
   stateFlags: StateFlag[];
   ragStates: RagState[];
   severities: Severity[];
+  searchQuery: string;
 };
 
 type DrilldownState = {
@@ -73,6 +74,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     stateFlags: [],
     ragStates: [],
     severities: [],
+    searchQuery: '',
   });
   const [drilldown, setDrilldown] = useState<DrilldownState>({ type: null, value: null, row: null });
 
@@ -94,6 +96,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       ? filters.customTo
       : BASELINE;
 
+    const q = filters.searchQuery.trim().toLowerCase();
+
     return allData.filter((row) => {
       const t = new Date(row.timestamp).getTime();
       if (t < cutoffStart.getTime() || t > cutoffEnd.getTime()) return false;
@@ -103,6 +107,10 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       if (filters.ragStates.length && !filters.ragStates.includes(row.ragState)) return false;
       if (filters.severities.length && (row.status !== 'BREACHED' || !filters.severities.includes(row.severity))) return false;
       if (filters.stateFlags.length && !filters.stateFlags.some(f => row.stateFlags.includes(f))) return false;
+      if (q) {
+        const hay = `${row.id} ${row.system} ${row.process} ${row.lob} ${row.assignee?.name ?? ''} ${row.auditLedgerId} ${row.resolutionStatus}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       return true;
     });
   }, [filters, allData]);
