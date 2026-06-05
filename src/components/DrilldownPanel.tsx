@@ -505,6 +505,80 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           </div>
         </div>
       )}
+
+      {/* Executive Flag + Reassign modal */}
+      {execModal && (
+        <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setExecModal(null)}>
+          <div className="bg-card border border-rag-red rounded-lg w-full max-w-md shadow-2xl exec-pulse" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Flag className="h-4 w-4 rag-red" />
+                {row.executiveFlag ? 'Reassign Flagged Ticket' : 'Raise Executive Flag & Reassign'}
+              </h3>
+              <button onClick={() => setExecModal(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+            </div>
+
+            {execModal.step === 'form' && (
+              <div className="p-4 space-y-3">
+                <div className="text-[10px] text-muted-foreground">
+                  Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reassign To</label>
+                  <select
+                    value={execModal.assignee}
+                    onChange={(e) => setExecModal({ ...execModal, assignee: e.target.value })}
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  >
+                    {ASSIGNEE_POOL.map(a => (
+                      <option key={a.name} value={a.name}>{a.name} — {a.role}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reason / Note (optional)</label>
+                  <input
+                    value={execModal.reason}
+                    onChange={(e) => setExecModal({ ...execModal, reason: e.target.value })}
+                    placeholder="e.g. direct line to CTO — needs hands-on owner"
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button onClick={() => setExecModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
+                  <button
+                    onClick={() => setExecModal({ ...execModal, step: 'confirm' })}
+                    className="text-[11px] px-3 py-1 rounded border bg-rag-red border-rag-red rag-red font-semibold hover:opacity-80"
+                  >Next →</button>
+                </div>
+              </div>
+            )}
+
+            {execModal.step === 'confirm' && (
+              <div className="p-4 space-y-3">
+                <div className="flex items-start gap-2 p-3 rounded border border-rag-red bg-rag-red">
+                  <AlertTriangle className="h-4 w-4 rag-red shrink-0 mt-0.5" />
+                  <div className="text-[11px]">
+                    <div className="font-semibold text-foreground mb-1">Confirm Executive Action</div>
+                    <div className="text-muted-foreground">
+                      This will raise an <span className="text-foreground font-semibold">Executive Flag</span>, nullify the SLA timer, and reassign ownership to <span className="text-foreground font-semibold">{execModal.assignee}</span>. The action will be written to the immutable audit ledger.
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button onClick={() => setExecModal({ ...execModal, step: 'form' })} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Back</button>
+                  <button
+                    onClick={() => commitExecFlag(execModal.assignee, execModal.reason)}
+                    className="text-[11px] px-3 py-1 rounded border font-semibold flex items-center gap-1 bg-rag-red border-rag-red rag-red hover:opacity-80"
+                  >
+                    <Lock className="h-3 w-3" /> Confirm &amp; Ledger
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
