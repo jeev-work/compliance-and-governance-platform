@@ -1,16 +1,27 @@
 import { useFilters } from '@/lib/filterContext';
 import { ChaseStep, KPIRow, RagState, LedgerEntry } from '@/lib/mockData';
 import { ROLE_ACTIONS } from '@/lib/rbac';
-import { cn, CHART_TOOLTIP } from '@/lib/utils';
+import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock,
+  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
 
 const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Security Eng', 'Cloud Platform'];
+const ASSIGNEE_POOL = [
+  { name: 'J. Chen',     role: 'Sr. Engineer' },
+  { name: 'M. Patel',    role: 'Compliance Lead' },
+  { name: 'S. Kumar',    role: 'DevOps Manager' },
+  { name: 'A. Williams', role: 'Risk Analyst' },
+  { name: 'R. Thompson', role: 'IT Support Lead' },
+  { name: 'K. Garcia',   role: 'Security Architect' },
+  { name: 'L. Zhang',    role: 'VP Engineering' },
+  { name: 'D. Okafor',   role: 'Head of Compliance' },
+  { name: 'P. Novak',    role: 'CTO' },
+];
 
 function newLedgerEntry(action: string, actor: string, details?: string): LedgerEntry {
   const hex = 'abcdef0123456789';
