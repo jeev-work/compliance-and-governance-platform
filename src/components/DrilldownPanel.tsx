@@ -159,15 +159,29 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     toast.success(`Multi-team dependency DISABLED · ledgered`);
   };
 
-  const onExec = () => {
+  const openExecModal = () => setExecModal({
+    assignee: ASSIGNEE_POOL.find(a => a.name !== row.assignee?.name)?.name ?? ASSIGNEE_POOL[0].name,
+    reason: '',
+    step: 'form',
+  });
+  const commitExecFlag = (assigneeName: string, reason: string) => {
+    const next = ASSIGNEE_POOL.find(a => a.name === assigneeName) ?? ASSIGNEE_POOL[0];
+    const ts = new Date().toISOString();
     mutateRow(row.id, {
       executiveFlag: true,
       ragState: 'RED',
       resolutionStatus: 'Escalated to HOD',
-      stateFlags: row.stateFlags.concat('Escalated'),
-      ledgerEntries: appendLedger(newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation')),
+      assignee: next,
+      stateFlags: [...row.stateFlags.filter(f => f !== 'Escalated'), 'Escalated'],
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Executive reassign → ${next.name}` }],
+      ledgerEntries: [
+        ...row.ledgerEntries,
+        newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation'),
+        newLedgerEntry('Reassigned by Executive', 'Executive · You', `→ ${next.name} (${next.role})${reason ? ` · ${reason}` : ''}`),
+      ],
     });
-    toast.error(`EXECUTIVE FLAG raised — SLA timer nullified, Level 2 escalation`);
+    setExecModal(null);
+    toast.error(`EXECUTIVE FLAG raised — reassigned to ${next.name}`);
   };
   const onReassign = () => {
     const pool = ['J. Chen', 'M. Patel', 'S. Kumar', 'A. Williams', 'R. Thompson', 'K. Garcia'].filter(n => n !== row.assignee?.name);
