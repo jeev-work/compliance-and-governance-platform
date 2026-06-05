@@ -1,16 +1,27 @@
 import { useFilters } from '@/lib/filterContext';
 import { ChaseStep, KPIRow, RagState, LedgerEntry } from '@/lib/mockData';
 import { ROLE_ACTIONS } from '@/lib/rbac';
-import { cn, CHART_TOOLTIP } from '@/lib/utils';
+import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock,
+  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
 
 const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Security Eng', 'Cloud Platform'];
+const ASSIGNEE_POOL = [
+  { name: 'J. Chen',     role: 'Sr. Engineer' },
+  { name: 'M. Patel',    role: 'Compliance Lead' },
+  { name: 'S. Kumar',    role: 'DevOps Manager' },
+  { name: 'A. Williams', role: 'Risk Analyst' },
+  { name: 'R. Thompson', role: 'IT Support Lead' },
+  { name: 'K. Garcia',   role: 'Security Architect' },
+  { name: 'L. Zhang',    role: 'VP Engineering' },
+  { name: 'D. Okafor',   role: 'Head of Compliance' },
+  { name: 'P. Novak',    role: 'CTO' },
+];
 
 function newLedgerEntry(action: string, actor: string, details?: string): LedgerEntry {
   const hex = 'abcdef0123456789';
@@ -52,7 +63,20 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
   // Dependency toggle modal state
   const [depModal, setDepModal] = useState<null | { mode: 'enable' | 'disable'; team: string; reason: string; step: 'form' | 'confirm' }>(null);
 
-  const fmt = (m: number | null) => !m ? '—' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+  // Executive Flag + Reassign modal state
+  const [execModal, setExecModal] = useState<null | { assignee: string; reason: string; step: 'form' | 'confirm' }>(null);
+
+  // Tick every 30s so the countdown re-renders without a full data refresh
+  const [, setNow] = useState(0);
+  useEffect(() => { const t = setInterval(() => setNow(n => n + 1), 30000); return () => clearInterval(t); }, []);
+
+  const countdown = escalationCountdown(row);
+
+  // Time since the most recent state transition (chase event)
+  const lastEvent = row.chaseTimeline[row.chaseTimeline.length - 1];
+  const sinceLastMin = lastEvent
+    ? Math.max(0, Math.floor((Date.now() - new Date(lastEvent.timestamp).getTime()) / 60000))
+    : null;
 
   const appendLedger = (entry: LedgerEntry) => [...row.ledgerEntries, entry];
 
@@ -135,15 +159,29 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     toast.success(`Multi-team dependency DISABLED · ledgered`);
   };
 
-  const onExec = () => {
+  const openExecModal = () => setExecModal({
+    assignee: ASSIGNEE_POOL.find(a => a.name !== row.assignee?.name)?.name ?? ASSIGNEE_POOL[0].name,
+    reason: '',
+    step: 'form',
+  });
+  const commitExecFlag = (assigneeName: string, reason: string) => {
+    const next = ASSIGNEE_POOL.find(a => a.name === assigneeName) ?? ASSIGNEE_POOL[0];
+    const ts = new Date().toISOString();
     mutateRow(row.id, {
       executiveFlag: true,
       ragState: 'RED',
       resolutionStatus: 'Escalated to HOD',
-      stateFlags: row.stateFlags.concat('Escalated'),
-      ledgerEntries: appendLedger(newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation')),
+      assignee: next,
+      stateFlags: [...row.stateFlags.filter(f => f !== 'Escalated'), 'Escalated'],
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Executive reassign → ${next.name}` }],
+      ledgerEntries: [
+        ...row.ledgerEntries,
+        newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation'),
+        newLedgerEntry('Reassigned by Executive', 'Executive · You', `→ ${next.name} (${next.role})${reason ? ` · ${reason}` : ''}`),
+      ],
     });
-    toast.error(`EXECUTIVE FLAG raised — SLA timer nullified, Level 2 escalation`);
+    setExecModal(null);
+    toast.error(`EXECUTIVE FLAG raised — reassigned to ${next.name}`);
   };
   const onReassign = () => {
     const pool = ['J. Chen', 'M. Patel', 'S. Kumar', 'A. Williams', 'R. Thompson', 'K. Garcia'].filter(n => n !== row.assignee?.name);
@@ -260,11 +298,22 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           </div>
         )}
 
-        {/* Timeline metrics */}
-        <div className="grid grid-cols-4 gap-2 px-4 py-3 border-b border-border">
-          <TS icon={Clock} color="text-primary"  label="Time to Detect" value={fmt(row.timeToDetectMin)} />
-          <TS icon={ArrowUpRight} color="rag-amber" label="Time to Escalate" value={fmt(row.timeToEscalateMin)} />
-          <TS icon={CheckCircle2} color="rag-green" label="Time to Resolve" value={fmt(row.timeToResolveMin)} />
+        {/* Timeline metrics — escalation countdown is always live, never "—" for breaches */}
+        <div className="grid grid-cols-5 gap-2 px-4 py-3 border-b border-border">
+          <TS icon={Clock} color="text-primary"  label="Time to Detect" value={fmtMinutes(row.timeToDetectMin)} />
+          <TS
+            icon={Timer}
+            color={countdown.tone === 'red' ? 'rag-red' : countdown.tone === 'amber' ? 'rag-amber' : countdown.tone === 'green' ? 'rag-green' : 'text-muted-foreground'}
+            label={countdown.overdue ? 'Escalate · OVERDUE' : 'Time to Escalate'}
+            value={countdown.label}
+          />
+          <TS icon={CheckCircle2} color="rag-green" label="Time to Resolve" value={fmtMinutes(row.timeToResolveMin)} />
+          <TS
+            icon={Send}
+            color="text-primary"
+            label="Since Last Update"
+            value={sinceLastMin == null ? '—' : fmtMinutes(sinceLastMin)}
+          />
           <div className="flex items-center gap-2">
             <User className="h-3.5 w-3.5 text-primary" />
             <div>
@@ -363,7 +412,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           {actions.includes('reassign') && <ActionBtn icon={User} label="Reassign" onClick={onReassign} />}
           {actions.includes('escalate') && <ActionBtn icon={ArrowUpRight} label="Escalate" onClick={onEscalate} variant="amber" />}
           {actions.includes('executiveFlag') && (
-            <ActionBtn icon={Flag} label="Executive Flag" onClick={onExec} variant="danger" />
+            <ActionBtn icon={Flag} label={row.executiveFlag ? 'Reassign (Exec)' : 'Executive Flag'} onClick={openExecModal} variant="danger" />
           )}
           {actions.includes('exportAudit') && (
             <ActionBtn icon={FileDown} label="Export Regulatory Audit" onClick={onExport} variant="primary" />
@@ -447,6 +496,80 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
                         ? 'bg-primary/15 border-primary/40 text-primary hover:bg-primary/25'
                         : 'bg-rag-amber border-rag-amber rag-amber hover:opacity-80',
                     )}
+                  >
+                    <Lock className="h-3 w-3" /> Confirm &amp; Ledger
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Executive Flag + Reassign modal */}
+      {execModal && (
+        <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setExecModal(null)}>
+          <div className="bg-card border border-rag-red rounded-lg w-full max-w-md shadow-2xl exec-pulse" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Flag className="h-4 w-4 rag-red" />
+                {row.executiveFlag ? 'Reassign Flagged Ticket' : 'Raise Executive Flag & Reassign'}
+              </h3>
+              <button onClick={() => setExecModal(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+            </div>
+
+            {execModal.step === 'form' && (
+              <div className="p-4 space-y-3">
+                <div className="text-[10px] text-muted-foreground">
+                  Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reassign To</label>
+                  <select
+                    value={execModal.assignee}
+                    onChange={(e) => setExecModal({ ...execModal, assignee: e.target.value })}
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  >
+                    {ASSIGNEE_POOL.map(a => (
+                      <option key={a.name} value={a.name}>{a.name} — {a.role}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reason / Note (optional)</label>
+                  <input
+                    value={execModal.reason}
+                    onChange={(e) => setExecModal({ ...execModal, reason: e.target.value })}
+                    placeholder="e.g. direct line to CTO — needs hands-on owner"
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button onClick={() => setExecModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
+                  <button
+                    onClick={() => setExecModal({ ...execModal, step: 'confirm' })}
+                    className="text-[11px] px-3 py-1 rounded border bg-rag-red border-rag-red rag-red font-semibold hover:opacity-80"
+                  >Next →</button>
+                </div>
+              </div>
+            )}
+
+            {execModal.step === 'confirm' && (
+              <div className="p-4 space-y-3">
+                <div className="flex items-start gap-2 p-3 rounded border border-rag-red bg-rag-red">
+                  <AlertTriangle className="h-4 w-4 rag-red shrink-0 mt-0.5" />
+                  <div className="text-[11px]">
+                    <div className="font-semibold text-foreground mb-1">Confirm Executive Action</div>
+                    <div className="text-muted-foreground">
+                      This will raise an <span className="text-foreground font-semibold">Executive Flag</span>, nullify the SLA timer, and reassign ownership to <span className="text-foreground font-semibold">{execModal.assignee}</span>. The action will be written to the immutable audit ledger.
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button onClick={() => setExecModal({ ...execModal, step: 'form' })} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Back</button>
+                  <button
+                    onClick={() => commitExecFlag(execModal.assignee, execModal.reason)}
+                    className="text-[11px] px-3 py-1 rounded border font-semibold flex items-center gap-1 bg-rag-red border-rag-red rag-red hover:opacity-80"
                   >
                     <Lock className="h-3 w-3" /> Confirm &amp; Ledger
                   </button>
