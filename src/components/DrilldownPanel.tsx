@@ -412,7 +412,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           {actions.includes('reassign') && <ActionBtn icon={User} label="Reassign" onClick={onReassign} />}
           {actions.includes('escalate') && <ActionBtn icon={ArrowUpRight} label="Escalate" onClick={onEscalate} variant="amber" />}
           {actions.includes('executiveFlag') && (
-            <ActionBtn icon={Flag} label="Executive Flag" onClick={onExec} variant="danger" />
+            <ActionBtn icon={Flag} label={row.executiveFlag ? 'Reassign (Exec)' : 'Executive Flag'} onClick={openExecModal} variant="danger" />
           )}
           {actions.includes('exportAudit') && (
             <ActionBtn icon={FileDown} label="Export Regulatory Audit" onClick={onExport} variant="primary" />
