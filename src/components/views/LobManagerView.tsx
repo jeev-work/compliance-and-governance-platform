@@ -111,26 +111,32 @@ export function LobManagerView() {
             <ArrowUpRight className="h-3 w-3" /> Escalation Rail
           </h3>
           <div className="space-y-1 max-h-[420px] overflow-y-auto scrollbar-thin">
-            {rail.map(r => (
-              <div key={r.id} onClick={() => openDrilldown('breach', r.id, r)}
-                className={cn(
-                  'rounded border px-2 py-1.5 text-[10px] cursor-pointer hover:ring-1 hover:ring-primary/50',
-                  r.resolutionStatus === 'Escalated to HOD' ? 'bg-rag-red border-rag-red' : 'bg-rag-amber border-rag-amber',
-                  r.executiveFlag && 'exec-pulse',
-                )}>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono font-semibold text-foreground">{r.id}</span>
-                  {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
-                  {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
-                  {r.stateFlags.includes('Unacknowledged') && <span title="Unacknowledged by SPOC"><AlertCircle className="h-3 w-3 rag-amber" /></span>}
+            {rail.map(r => {
+              const c = escalationCountdown(r);
+              const toneClass = c.tone === 'red' ? 'rag-red' : c.tone === 'amber' ? 'rag-amber' : c.tone === 'green' ? 'rag-green' : 'text-muted-foreground';
+              return (
+                <div key={r.id} onClick={() => openDrilldown('breach', r.id, r)}
+                  className={cn(
+                    'rounded border px-2 py-1.5 text-[10px] cursor-pointer hover:ring-1 hover:ring-primary/50',
+                    r.resolutionStatus === 'Escalated to HOD' ? 'bg-rag-red border-rag-red' : 'bg-rag-amber border-rag-amber',
+                    (r.executiveFlag || c.overdue) && 'exec-pulse',
+                  )}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-semibold text-foreground">{r.id}</span>
+                    {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
+                    {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
+                    {r.stateFlags.includes('Unacknowledged') && <span title="Unacknowledged by SPOC"><AlertCircle className="h-3 w-3 rag-amber" /></span>}
+                  </div>
+                  <div className="text-muted-foreground mt-0.5">{r.system} · {r.process}</div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-muted-foreground">{r.lob} · {r.assignee?.name || 'unassigned'}</span>
+                    <span className={cn('flex items-center gap-1 font-semibold', toneClass)}>
+                      <Clock className="h-2.5 w-2.5" /> {c.label}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-muted-foreground mt-0.5">{r.system} · {r.process}</div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-muted-foreground">{r.lob} · {r.assignee?.name || 'unassigned'}</span>
-                  <span className="flex items-center gap-1 text-muted-foreground"><Clock className="h-2.5 w-2.5" /> {r.timeToEscalateMin ? `${r.timeToEscalateMin}m` : '—'}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {rail.length === 0 && <div className="text-[10px] text-muted-foreground italic text-center py-4">No active escalations</div>}
           </div>
         </div>
