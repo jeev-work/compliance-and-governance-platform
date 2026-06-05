@@ -284,11 +284,22 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           </div>
         )}
 
-        {/* Timeline metrics */}
-        <div className="grid grid-cols-4 gap-2 px-4 py-3 border-b border-border">
-          <TS icon={Clock} color="text-primary"  label="Time to Detect" value={fmt(row.timeToDetectMin)} />
-          <TS icon={ArrowUpRight} color="rag-amber" label="Time to Escalate" value={fmt(row.timeToEscalateMin)} />
-          <TS icon={CheckCircle2} color="rag-green" label="Time to Resolve" value={fmt(row.timeToResolveMin)} />
+        {/* Timeline metrics — escalation countdown is always live, never "—" for breaches */}
+        <div className="grid grid-cols-5 gap-2 px-4 py-3 border-b border-border">
+          <TS icon={Clock} color="text-primary"  label="Time to Detect" value={fmtMinutes(row.timeToDetectMin)} />
+          <TS
+            icon={Timer}
+            color={countdown.tone === 'red' ? 'rag-red' : countdown.tone === 'amber' ? 'rag-amber' : countdown.tone === 'green' ? 'rag-green' : 'text-muted-foreground'}
+            label={countdown.overdue ? 'Escalate · OVERDUE' : 'Time to Escalate'}
+            value={countdown.label}
+          />
+          <TS icon={CheckCircle2} color="rag-green" label="Time to Resolve" value={fmtMinutes(row.timeToResolveMin)} />
+          <TS
+            icon={Send}
+            color="text-primary"
+            label="Since Last Update"
+            value={sinceLastMin == null ? '—' : fmtMinutes(sinceLastMin)}
+          />
           <div className="flex items-center gap-2">
             <User className="h-3.5 w-3.5 text-primary" />
             <div>
