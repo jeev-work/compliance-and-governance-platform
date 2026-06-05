@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
-import { cn } from '@/lib/utils';
+import { cn, escalationCountdown } from '@/lib/utils';
 import { Users, AlertCircle, ArrowUpRight, GitFork, Clock, Flag } from 'lucide-react';
 import type { RagState } from '@/lib/mockData';
 
