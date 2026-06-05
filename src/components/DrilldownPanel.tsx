@@ -63,7 +63,20 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
   // Dependency toggle modal state
   const [depModal, setDepModal] = useState<null | { mode: 'enable' | 'disable'; team: string; reason: string; step: 'form' | 'confirm' }>(null);
 
-  const fmt = (m: number | null) => !m ? '—' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+  // Executive Flag + Reassign modal state
+  const [execModal, setExecModal] = useState<null | { assignee: string; reason: string; step: 'form' | 'confirm' }>(null);
+
+  // Tick every 30s so the countdown re-renders without a full data refresh
+  const [, setNow] = useState(0);
+  useEffect(() => { const t = setInterval(() => setNow(n => n + 1), 30000); return () => clearInterval(t); }, []);
+
+  const countdown = escalationCountdown(row);
+
+  // Time since the most recent state transition (chase event)
+  const lastEvent = row.chaseTimeline[row.chaseTimeline.length - 1];
+  const sinceLastMin = lastEvent
+    ? Math.max(0, Math.floor((Date.now() - new Date(lastEvent.timestamp).getTime()) / 60000))
+    : null;
 
   const appendLedger = (entry: LedgerEntry) => [...row.ledgerEntries, entry];
 
