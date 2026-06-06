@@ -700,6 +700,71 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           </div>
         </div>
       )}
+
+      {/* Standard Reassign modal — dropdown of available people with phone numbers */}
+      {reassignModal && (() => {
+        const selected = ASSIGNEES.find(a => a.name === reassignModal.assignee);
+        const pool = ASSIGNEES.filter(a => a.name !== row.assignee?.name);
+        return (
+          <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setReassignModal(null)}>
+            <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" /> Reassign Ticket
+                </h3>
+                <button onClick={() => setReassignModal(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="text-[10px] text-muted-foreground">
+                  Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span> <ContactPhone name={row.assignee?.name} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reassign To</label>
+                  <select
+                    value={reassignModal.assignee}
+                    onChange={(e) => setReassignModal({ ...reassignModal, assignee: e.target.value })}
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  >
+                    {pool.map(a => (
+                      <option key={a.name} value={a.name}>{a.name} — {a.role} · {a.phone}</option>
+                    ))}
+                  </select>
+                  {selected && (
+                    <div className="mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span>Contact before assigning:</span>
+                      <a
+                        href={`tel:${selected.phone.replace(/[^+\d]/g, '')}`}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary font-mono hover:bg-primary/20"
+                      >
+                        <Phone className="h-3 w-3" />{selected.phone}
+                      </a>
+                      <span className="text-muted-foreground">· {selected.role}</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Handover note (optional)</label>
+                  <input
+                    value={reassignModal.reason}
+                    onChange={(e) => setReassignModal({ ...reassignModal, reason: e.target.value })}
+                    placeholder="e.g. context already shared on call — please continue triage"
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button onClick={() => setReassignModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
+                  <button
+                    onClick={() => commitReassign(reassignModal.assignee, reassignModal.reason)}
+                    className="text-[11px] px-3 py-1 rounded border bg-primary/15 border-primary/40 text-primary font-semibold hover:bg-primary/25 flex items-center gap-1"
+                  >
+                    <Send className="h-3 w-3" /> Confirm Reassignment
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
