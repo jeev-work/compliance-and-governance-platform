@@ -3,7 +3,7 @@ import { useFilters } from '@/lib/filterContext';
 import { cn, CHART_TOOLTIP } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { ChevronUp, ChevronDown, Inbox, Wrench, GitFork, ShieldAlert } from 'lucide-react';
-import { RagState } from '@/lib/mockData';
+import { RagState, RAG_SHORT } from '@/lib/mockData';
 
 type SortKey = 'timestamp' | 'lob' | 'system' | 'process' | 'failureRate' | 'breaches' | 'severity' | 'riskScore';
 
