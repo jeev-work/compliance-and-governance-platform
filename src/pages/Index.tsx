@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { FilterProvider, useFilters } from '@/lib/filterContext';
 import { AppSidebar } from '@/components/AppSidebar';
 import { GlobalFilterBar } from '@/components/GlobalFilterBar';
@@ -10,13 +11,15 @@ import { AdminHealthView } from '@/components/views/AdminHealthView';
 import { DrilldownPanel } from '@/components/DrilldownPanel';
 import { KpiHistoryPanel } from '@/components/KpiHistoryPanel';
 import { NotificationPanel } from '@/components/NotificationPanel';
+import { NocWallboard } from '@/components/NocWallboard';
 
 function DashboardContent() {
   const { filters } = useFilters();
+  const [wallboardOpen, setWallboardOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen w-full">
-      <AppSidebar />
+      <AppSidebar onLaunchWallboard={() => setWallboardOpen(true)} activeWallboard={wallboardOpen} />
       <div className="flex-1 flex flex-col min-w-0">
         <GlobalFilterBar />
         <main className="flex-1 p-3 overflow-y-auto scrollbar-thin">
@@ -31,6 +34,7 @@ function DashboardContent() {
         </main>
       </div>
       <DrilldownPanel />
+      <NocWallboard open={wallboardOpen} onClose={() => setWallboardOpen(false)} />
     </div>
   );
 }
