@@ -766,7 +766,7 @@ function GroupDrilldown({ type, value, rows, onClose, onSelectBreach }: {
                 <span className="font-mono rag-red">{row.breaches} breaches</span>
                 {row.executiveFlag && <ShieldAlert className="h-3 w-3 rag-red" />}
                 <span className="ml-auto text-muted-foreground">{row.resolutionStatus}</span>
-                {row.assignee && <span className="text-muted-foreground">→ {row.assignee.name}</span>}
+                {row.assignee && <span className="text-muted-foreground">→ {row.assignee.name} <ContactPhone name={row.assignee.name} /></span>}
               </div>
             ))}
             {breached.length > 50 && <div className="text-center text-[10px] text-muted-foreground py-1">+{breached.length - 50} more</div>}
