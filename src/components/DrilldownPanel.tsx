@@ -487,17 +487,43 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
         <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center gap-2 flex-wrap rounded-b-lg">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mr-1">Actions</span>
           {actions.includes('acknowledge') && (
-            <ActionBtn icon={CheckCircle2} label="Acknowledge" onClick={onAcknowledge} />
+            <ActionBtn
+              icon={CheckCircle2}
+              label="Acknowledge"
+              onClick={onAcknowledge}
+              disabled={row.resolutionStatus !== 'Open' || row.stateFlags.includes('Acknowledged')}
+              disabledLabel="Acknowledged"
+            />
           )}
           {actions.includes('deployResolution') && (
-            <ActionBtn icon={Wrench} label="Deploy Resolution" onClick={onDeploy} variant="primary" />
+            <ActionBtn
+              icon={Wrench}
+              label="Deploy Resolution"
+              onClick={onDeploy}
+              variant="primary"
+              disabled={row.status === 'CLEAN' || row.resolutionStatus === 'Verifying' || row.resolutionStatus === 'Resolved'}
+              disabledLabel={row.resolutionStatus === 'Verifying' ? 'Verifying…' : 'Resolution Deployed'}
+            />
           )}
           {actions.includes('tagDependency') && (
             row.dependency
-              ? <ActionBtn icon={GitFork} label="Disable Multi-Team Dependency" onClick={openDisableDep} variant="amber" />
-              : <ActionBtn icon={GitFork} label="Enable Multi-Team Dependency"  onClick={openEnableDep} />
+              ? <ActionBtn
+                  icon={GitFork}
+                  label="Disable Multi-Team Dependency"
+                  onClick={openDisableDep}
+                  variant="amber"
+                  disabled={row.resolutionStatus === 'Verifying' || row.resolutionStatus === 'Resolved'}
+                  disabledLabel="Dependency Locked"
+                />
+              : <ActionBtn
+                  icon={GitFork}
+                  label="Enable Multi-Team Dependency"
+                  onClick={openEnableDep}
+                  disabled={row.resolutionStatus === 'Verifying' || row.resolutionStatus === 'Resolved'}
+                  disabledLabel="Resolution In Progress"
+                />
           )}
-          {actions.includes('reassign') && <ActionBtn icon={User} label="Reassign" onClick={onReassign} />}
+          {actions.includes('reassign') && <ActionBtn icon={User} label="Reassign" onClick={openReassignModal} />}
           {actions.includes('escalate') && <ActionBtn icon={ArrowUpRight} label="Escalate" onClick={onEscalate} variant="amber" />}
           {actions.includes('executiveFlag') && (
             <ActionBtn icon={Flag} label={row.executiveFlag ? 'Reassign (Exec)' : 'Executive Flag'} onClick={openExecModal} variant="danger" />
