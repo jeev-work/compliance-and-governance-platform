@@ -1,55 +1,67 @@
-## 1. LoB Manager · Clickable RAG matrix tiles
+Four independent changes. All scoped to existing files; no schema or backend work.
 
-`src/components/views/LobManagerView.tsx`
-- Each non-empty matrix cell currently opens nothing concrete. Wire each cell to open a new drilldown type `'matrixCell'` carrying `{ system, process }`.
-- Extend `DrilldownState['type']` in `filterContext.tsx` to include `'matrixCell'`, and update `DrilldownPanel.tsx` to render a new "Cell KPI Status" view listing every KPI in that system×process intersection with its live RAG, assignee, escalation countdown, and a row click that opens the existing breach drilldown.
+## 1. Reassign → dropdown of people with phone numbers
 
-## 2. Fix GRE/GRY collision across the app
+**File:** `src/components/DrilldownPanel.tsx`
 
-Audit and rename the 3-letter RAG abbreviations everywhere they appear:
-- `GlobalFilterBar.tsx` chip labels — `GREEN → GRN`, `GREY → GRY` (currently both render `GRE`).
-- `LobManagerView.tsx` matrix cell label (`w.slice(0, 3)`) — replace with a `RAG_SHORT` map: `{GREEN:'GRN', AMBER:'AMB', RED:'RED', GREY:'GRY', BLUE:'BLU', UNCONFIGURED:'UNC'}`.
-- Search other views (`ExecutiveView`, `SpocView`, `AnalystView`, `AdminHealthView`, `KpiHistoryPanel`) for any `.slice(0,3)` or hard-coded "GRE" usages and replace with the same map.
-- Centralize the map in `src/lib/mockData.ts` (or `utils.ts`) as `export const RAG_SHORT` so it can't drift.
+- Replace `onReassign` (line 271, currently picks a random name silently) with `openReassignModal` that opens a new dialog.
+- Add `reassignModal` state next to existing `execModal`/`depModal`: `{ assignee, reason, step }`.
+- Build dialog (same overlay/card pattern as the Executive-Flag modal at ~line 597). Contents:
+  - Header: "Reassign Ticket"
+  - Current assignee line with existing `ContactPhone` chip
+  - `<select>` labelled "Reassign To" populated from `ASSIGNEES` (already exported from `mockData.ts`, 10 people with name + role + phone). Current assignee filtered out. Option label: `Name — Role`.
+  - To the right of the dropdown render the selected person's phone as a `tel:` link with the `Phone` icon (reuse `ContactPhone`), so the user can call them before confirming.
+  - Optional "Handover note" textarea.
+  - Footer: Cancel + Confirm Reassignment.
+- `commitReassign` mutates `assignee` to the full `ASSIGNEES` record (so role + phone propagate), pushes a `Notified` chase event, appends a `Reassigned` ledger entry including the note, toasts confirmation. Executive-Flag modal is left untouched.
 
-## 3. Per-KPI SLA version history
+## 2. SPOC view — disable buttons after use
 
-Today `slaVersion` is a single string per row and the vault in `AdminHealthView.tsx` aggregates by version across rows. Change the model so each KPI carries its own version trail.
+**File:** `src/components/DrilldownPanel.tsx` (action buttons live in the drilldown, used by SPOC)
 
-`src/lib/mockData.ts`
-- Add `slaHistory: { version: string; activeFrom: string; changedBy: string; threshold: number; changeNote: string }[]` on `KPIRow`. Seed each row with 1–3 prior versions so the trail is non-empty.
-- Keep `slaVersion` as the current active pointer (last item in `slaHistory`).
+- `Acknowledge` button: disabled when `row.resolutionStatus !== 'Open'` OR `row.stateFlags.includes('Acknowledged')`. Already-acknowledged rows show the button greyed with label "Acknowledged".
+- `Deploy Resolution` button: disabled when `row.resolutionStatus` is `Verifying` or `Resolved`, or the row is `CLEAN`.
+- `Enable Multi-Team Dependency` button (opens `depModal` `enable`): disabled when `row.resolutionStatus` is `Verifying`/`Resolved` OR a dependency is already open. Label switches to "Dependency Active" when one exists.
+- Disabled state uses existing `ActionBtn` styling — add a `disabled` prop that applies `opacity-50 cursor-not-allowed pointer-events-none` and skips the `onClick`.
 
-`AdminHealthView.tsx`
-- Replace the aggregated vault table with a two-pane layout: left = KPI search/picker (reuses `filteredData`), right = that KPI's full version history table (version, activeFrom, changedBy, threshold, note, currently-active badge).
-- Keep an "All versions in scope" summary chip strip above for the previous bird's-eye view.
+No business-logic change — same handlers, just gated.
 
-`KpiHistoryPanel.tsx` — also surface the per-KPI SLA history alongside the existing malfunction history (gated by role as today).
+## 3. Per-role notification panel on the home page
 
-## 4. Admin authoring — KPIs, LoBs, departments
+**File:** new `src/components/NotificationPanel.tsx`, mounted in `src/pages/Index.tsx` above the role view (after `KpiHistoryPanel`).
 
-`AdminHealthView.tsx` (new "Authoring" tab/section)
-- Three "Add new…" dialogs: **KPI**, **LoB**, **Department/System**. Each writes into a new in-memory registry exposed by `filterContext.tsx` (`registries: { lobs, systems, kpis }` + `addLob`, `addSystem`, `addKpi`).
-- New KPI form fields: id (auto `KPI-…`), LoB, system, process, source, target SLA threshold, severity defaults, SPOC owner, attached config-file name (free text or upload stub).
-- On create, append a `LedgerEntry` to that KPI's `ledgerEntries` array (`action: 'KPI Created'`) and also write to a new top-level `masterLedger` (see §5).
-- Every new LoB / department gets its own independent ledger stored on a `lobLedgers: Record<string, LedgerEntry[]>` and `systemLedgers: Record<string, LedgerEntry[]>` in `filterContext`.
+The panel reads `useFilters()` and renders a compact, collapsible card whose contents change per role:
 
-## 5. Master + micro ledger export with config-snapshot integrity
+| Role | Notification feed contents (top 5, scroll for more) |
+| --- | --- |
+| executive   | New RED breaches in last 24h + any `executiveFlag` rows + escalations to HOD |
+| lobManager  | Unacknowledged breaches in scoped LoB + countdown-overdue rows + cross-functional forks needing visibility |
+| spoc        | Unacknowledged + Investigating rows assigned to current scope (chase-timer red zone first) |
+| compliance  | Newly-Resolved rows pending ledger sign-off + any GREY-state rows (data integrity) |
+| analyst     | Top 5 KPIs by 7-day breach trend delta (drives investigation) |
+| admin       | Connector outages (GREY clusters) + verification-pending rows + most recent ledger writes |
 
-`src/lib/filterContext.tsx`
-- Introduce `masterLedger: LedgerEntry[]` aggregating every mutation (already routed through `mutateRow`, plus the new admin authoring actions).
-- Add `configSnapshots: { version: string; capturedAt: string; thresholds: Record<string, number>; ragRules: ... }[]`. Each time an SLA threshold changes (admin authoring or a new `slaHistory` entry), snapshot the current rules.
-- Every `KPIRow` already carries `slaVersion`; persist alongside it the `configSnapshotId` that was active when the row was evaluated, so historic rows always reference the rules they were judged under.
+Each notification is a row with: icon (severity tone), KPI id (mono), system/process, short reason, timestamp ("12m ago"), assignee + phone via `getContactPhone`. Click → existing `openDrilldown('breach', row.id, row)`. Empty state: "All clear — no notifications for this role." Toggle button collapses the panel; state lives in local React state (no persistence needed).
 
-Export mechanism (new `src/lib/exportLedger.ts` helper, button in `AdminHealthView` and `ComplianceView`):
-- **Export Master Ledger** → CSV/JSON of `masterLedger` + the full `configSnapshots` table.
-- **Export Micro Ledger** → per-KPI / per-LoB / per-system download of that entity's `ledgerEntries`, each row stamped with its `configSnapshotId` and the snapshot's thresholds inlined.
-- Add an "Integrity guarantee" notice in the dialog: re-evaluation always uses the snapshot active at incident time, so RAG/breach counts in the export match the configuration of that moment, never the current config.
+## 4. Fix unrealistic countdowns ("OVERDUE · -13h 35m" etc.)
 
-## Technical notes
+**File:** `src/lib/mockData.ts`, `generateMockData` (lines 169–260)
 
-- All new state lives in `FilterProvider` so existing `useFilters` consumers pick it up; no backend changes.
-- New drilldown type `'matrixCell'` requires a small switch in `DrilldownPanel.tsx`'s render block — reuse existing list styles.
-- The RAG short-label map is the single source of truth; remove every ad-hoc `slice(0,3)` to prevent regressions.
-- Export uses a client-side blob download (`Blob` + `URL.createObjectURL`), no server needed.
-- Ledger entries continue to use the existing `fakeHash`/`LedgerEntry` shape so the immutable-chain UX stays consistent.
+Root cause: `baseDate` is hard-coded to `May 14, 2026` while today is `June 6, 2026`, and `hoursAgo` spans 90 days. Every open breach is therefore weeks past its 30–240-minute SLA budget, so `escalationCountdown` shows huge negative values.
+
+Changes (data generation only — no logic change in `utils.ts`):
+
+- `const baseDate = new Date();` (current time at generation).
+- Keep the 90-day window for **historical** rows (`Resolved`, `CLEAN`, `Verifying`), so trend charts still have depth.
+- For rows that will end up `Open`, `Investigating`, `Escalated to HOD`, or `Unacknowledged`, clamp `ts` to within the last `severity` budget × 2 (i.e. Critical within 60 min, High within 120 min, Medium within 4 h, Low within 8 h). Implementation: after the row is shaped, if `status === 'BREACHED'` and `resolutionStatus` is one of the open states, recompute `ts = new Date(now - rand() * budget*2 * 60000)` and propagate to `timestamp`, ledger seed, and chase-timeline offsets.
+- Grey-outage cluster anchor (`greyOutageStart`) repointed to `baseDate - 2d` so it stays inside the visible window.
+- Blue maintenance window: change the Saturday filter to "within the last completed Saturday window" so it doesn't bunch into a single ancient date.
+- Resolved rows keep their actual age (chips already show "resolved in 4h 12m" — that's fine and stays).
+
+Result: most open breaches show realistic countdowns ("23m left", "1h 04m left", at worst "OVERDUE · -45m") instead of "-13h 35m".
+
+## Out of scope
+
+- Persisting notification dismissals or panel collapsed-state across reloads.
+- Changing role-based access for the Reassign button (still gated by `ROLE_ACTIONS`).
+- Editing the separate Executive-Flag reassignment dialog.

@@ -1,5 +1,5 @@
 import { useFilters } from '@/lib/filterContext';
-import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone } from '@/lib/mockData';
+import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone, ASSIGNEES } from '@/lib/mockData';
 import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
@@ -151,6 +151,9 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
   // Executive Flag + Reassign modal state
   const [execModal, setExecModal] = useState<null | { assignee: string; reason: string; step: 'form' | 'confirm' }>(null);
 
+  // Standard Reassign modal state (non-executive)
+  const [reassignModal, setReassignModal] = useState<null | { assignee: string; reason: string }>(null);
+
   // Tick every 30s so the countdown re-renders without a full data refresh
   const [, setNow] = useState(0);
   useEffect(() => { const t = setInterval(() => setNow(n => n + 1), 30000); return () => clearInterval(t); }, []);
@@ -268,15 +271,19 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     setExecModal(null);
     toast.error(`EXECUTIVE FLAG raised — reassigned to ${next.name}`);
   };
-  const onReassign = () => {
-    const pool = ['J. Chen', 'M. Patel', 'S. Kumar', 'A. Williams', 'R. Thompson', 'K. Garcia'].filter(n => n !== row.assignee?.name);
-    const next = pool[Math.floor(Math.random() * pool.length)];
+  const openReassignModal = () => setReassignModal({
+    assignee: ASSIGNEES.find(a => a.name !== row.assignee?.name)?.name ?? ASSIGNEES[0].name,
+    reason: '',
+  });
+  const commitReassign = (assigneeName: string, note: string) => {
+    const next = ASSIGNEES.find(a => a.name === assigneeName) ?? ASSIGNEES[0];
     mutateRow(row.id, {
-      assignee: { name: next, role: 'Sr. Engineer' },
-      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: new Date().toISOString(), actor: `Reassigned → ${next}` }],
-      ledgerEntries: appendLedger(newLedgerEntry('Reassigned', 'LOB Manager · You', `→ ${next}`)),
+      assignee: { name: next.name, role: next.role },
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: new Date().toISOString(), actor: `Reassigned → ${next.name}` }],
+      ledgerEntries: appendLedger(newLedgerEntry('Reassigned', 'LOB Manager · You', `→ ${next.name} (${next.role})${note ? ` · ${note}` : ''}`)),
     });
-    toast.success(`${row.id} reassigned to ${next}`);
+    setReassignModal(null);
+    toast.success(`${row.id} reassigned to ${next.name} · ${next.phone}`);
   };
   const onEscalate = () => {
     mutateRow(row.id, {
@@ -487,17 +494,43 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
         <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center gap-2 flex-wrap rounded-b-lg">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mr-1">Actions</span>
           {actions.includes('acknowledge') && (
-            <ActionBtn icon={CheckCircle2} label="Acknowledge" onClick={onAcknowledge} />
+            <ActionBtn
+              icon={CheckCircle2}
+              label="Acknowledge"
+              onClick={onAcknowledge}
+              disabled={row.resolutionStatus !== 'Open' || row.stateFlags.includes('Acknowledged')}
+              disabledLabel="Acknowledged"
+            />
           )}
           {actions.includes('deployResolution') && (
-            <ActionBtn icon={Wrench} label="Deploy Resolution" onClick={onDeploy} variant="primary" />
+            <ActionBtn
+              icon={Wrench}
+              label="Deploy Resolution"
+              onClick={onDeploy}
+              variant="primary"
+              disabled={row.status === 'CLEAN' || row.resolutionStatus === 'Verifying' || row.resolutionStatus === 'Resolved'}
+              disabledLabel={row.resolutionStatus === 'Verifying' ? 'Verifying…' : 'Resolution Deployed'}
+            />
           )}
           {actions.includes('tagDependency') && (
             row.dependency
-              ? <ActionBtn icon={GitFork} label="Disable Multi-Team Dependency" onClick={openDisableDep} variant="amber" />
-              : <ActionBtn icon={GitFork} label="Enable Multi-Team Dependency"  onClick={openEnableDep} />
+              ? <ActionBtn
+                  icon={GitFork}
+                  label="Disable Multi-Team Dependency"
+                  onClick={openDisableDep}
+                  variant="amber"
+                  disabled={row.resolutionStatus === 'Verifying' || row.resolutionStatus === 'Resolved'}
+                  disabledLabel="Dependency Locked"
+                />
+              : <ActionBtn
+                  icon={GitFork}
+                  label="Enable Multi-Team Dependency"
+                  onClick={openEnableDep}
+                  disabled={row.resolutionStatus === 'Verifying' || row.resolutionStatus === 'Resolved'}
+                  disabledLabel="Resolution In Progress"
+                />
           )}
-          {actions.includes('reassign') && <ActionBtn icon={User} label="Reassign" onClick={onReassign} />}
+          {actions.includes('reassign') && <ActionBtn icon={User} label="Reassign" onClick={openReassignModal} />}
           {actions.includes('escalate') && <ActionBtn icon={ArrowUpRight} label="Escalate" onClick={onEscalate} variant="amber" />}
           {actions.includes('executiveFlag') && (
             <ActionBtn icon={Flag} label={row.executiveFlag ? 'Reassign (Exec)' : 'Executive Flag'} onClick={openExecModal} variant="danger" />
@@ -667,22 +700,93 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           </div>
         </div>
       )}
+
+      {/* Standard Reassign modal — dropdown of available people with phone numbers */}
+      {reassignModal && (() => {
+        const selected = ASSIGNEES.find(a => a.name === reassignModal.assignee);
+        const pool = ASSIGNEES.filter(a => a.name !== row.assignee?.name);
+        return (
+          <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setReassignModal(null)}>
+            <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" /> Reassign Ticket
+                </h3>
+                <button onClick={() => setReassignModal(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="text-[10px] text-muted-foreground">
+                  Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span> <ContactPhone name={row.assignee?.name} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reassign To</label>
+                  <select
+                    value={reassignModal.assignee}
+                    onChange={(e) => setReassignModal({ ...reassignModal, assignee: e.target.value })}
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  >
+                    {pool.map(a => (
+                      <option key={a.name} value={a.name}>{a.name} — {a.role} · {a.phone}</option>
+                    ))}
+                  </select>
+                  {selected && (
+                    <div className="mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span>Contact before assigning:</span>
+                      <a
+                        href={`tel:${selected.phone.replace(/[^+\d]/g, '')}`}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary font-mono hover:bg-primary/20"
+                      >
+                        <Phone className="h-3 w-3" />{selected.phone}
+                      </a>
+                      <span className="text-muted-foreground">· {selected.role}</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Handover note (optional)</label>
+                  <input
+                    value={reassignModal.reason}
+                    onChange={(e) => setReassignModal({ ...reassignModal, reason: e.target.value })}
+                    placeholder="e.g. context already shared on call — please continue triage"
+                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button onClick={() => setReassignModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
+                  <button
+                    onClick={() => commitReassign(reassignModal.assignee, reassignModal.reason)}
+                    className="text-[11px] px-3 py-1 rounded border bg-primary/15 border-primary/40 text-primary font-semibold hover:bg-primary/25 flex items-center gap-1"
+                  >
+                    <Send className="h-3 w-3" /> Confirm Reassignment
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
-function ActionBtn({ icon: Icon, label, onClick, variant = 'default' }: {
+function ActionBtn({ icon: Icon, label, onClick, variant = 'default', disabled = false, disabledLabel }: {
   icon: any; label: string; onClick: () => void; variant?: 'default' | 'primary' | 'danger' | 'amber';
+  disabled?: boolean; disabledLabel?: string;
 }) {
   return (
-    <button onClick={onClick} className={cn(
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={disabled && disabledLabel ? disabledLabel : undefined}
+      className={cn(
       'flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded border transition-colors',
       variant === 'default' && 'bg-secondary border-border hover:bg-accent text-foreground',
       variant === 'primary' && 'bg-primary/15 border-primary/40 text-primary hover:bg-primary/25',
       variant === 'danger'  && 'bg-rag-red border-rag-red rag-red hover:bg-destructive/25',
       variant === 'amber'   && 'bg-rag-amber border-rag-amber rag-amber',
+      disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
     )}>
-      <Icon className="h-3 w-3" /> {label}
+      <Icon className="h-3 w-3" /> {disabled && disabledLabel ? disabledLabel : label}
     </button>
   );
 }

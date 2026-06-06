@@ -166,10 +166,13 @@ function pickRagState(rand: () => number): RagState {
   return 'UNCONFIGURED';
 }
 
+/** SLA escalation budget by severity (minutes). Mirrors utils.ESCALATE_BUDGET_MIN. */
+const SEV_BUDGET_MIN: Record<string, number> = { Critical: 30, High: 60, Medium: 120, Low: 240 };
+
 export function generateMockData(count = 30000): KPIRow[] {
   const rand = seeded(42);
   const rows: KPIRow[] = [];
-  const baseDate = new Date(2026, 4, 14); // May 14, 2026
+  const baseDate = new Date(); // anchor to "now" so countdowns are realistic
 
   // Pre-seed a Grey connector outage cluster (Blueprint §2 Exception 1)
   const greyOutageStart = new Date(baseDate.getTime() - 2 * 86400000);
@@ -180,7 +183,7 @@ export function generateMockData(count = 30000): KPIRow[] {
 
   for (let i = 0; i < count; i++) {
     const hoursAgo = Math.floor(rand() * 90 * 24);
-    const ts = new Date(baseDate.getTime() - hoursAgo * 3600000);
+    let ts = new Date(baseDate.getTime() - hoursAgo * 3600000);
     const date = ts.toISOString().split('T')[0];
     const system = pick(rand, SYSTEMS);
     const process = pick(rand, PROCESSES);
@@ -231,6 +234,19 @@ export function generateMockData(count = 30000): KPIRow[] {
       resolutionStatus = r < 0.35 ? 'Resolved' : r < 0.55 ? 'Verifying' : r < 0.75 ? 'Investigating' : r < 0.9 ? 'Escalated to HOD' : 'Open';
       assignee = pick(rand, ASSIGNEES);
       timeToDetectMin = Math.floor(rand() * 120) + 1;
+
+      // Clamp open/unresolved breaches to within the SLA budget window so countdowns
+      // show realistic numbers ("23m left", "OVERDUE · -12m") instead of "-13h 35m".
+      const isOpen = resolutionStatus === 'Open' || resolutionStatus === 'Investigating' || resolutionStatus === 'Escalated to HOD';
+      if (isOpen) {
+        const provisionalSev: Severity = ragState === 'RED'
+          ? (failureRate > 1 ? 'Critical' : failureRate > 0.5 ? 'High' : 'Medium')
+          : 'Medium';
+        const budget = SEV_BUDGET_MIN[provisionalSev] ?? 120;
+        // Most rows still in budget; a minority overdue by a small amount.
+        const ageMin = Math.floor(rand() * budget * 1.4);
+        ts = new Date(baseDate.getTime() - ageMin * 60000);
+      }
 
       if (resolutionStatus === 'Resolved' || resolutionStatus === 'Verifying') {
         timeToResolveMin = Math.floor(rand() * 2880) + 30;
