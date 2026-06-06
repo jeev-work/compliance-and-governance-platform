@@ -108,7 +108,7 @@ export function ComplianceView() {
                   <td className="px-2 py-1 font-mono text-[10px] text-muted-foreground">{r.auditLedgerId}</td>
                   <td className="px-2 py-1 text-[10px]">{r.resolutionStatus}</td>
                   <td className="px-2 py-1 text-right" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => toast.success(`Exported · hash ${r.auditLedgerId}`)}
+                    <button onClick={() => { exportMicroLedger({ kind: 'kpi', name: r.id }, r.ledgerEntries, configSnapshots, r); toast.success(`Micro ledger exported · ${r.id}`); }}
                       className="text-[10px] text-primary hover:underline flex items-center gap-1 ml-auto">
                       <FileDown className="h-3 w-3" /> Export
                     </button>
