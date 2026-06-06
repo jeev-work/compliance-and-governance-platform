@@ -151,6 +151,9 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
   // Executive Flag + Reassign modal state
   const [execModal, setExecModal] = useState<null | { assignee: string; reason: string; step: 'form' | 'confirm' }>(null);
 
+  // Standard Reassign modal state (non-executive)
+  const [reassignModal, setReassignModal] = useState<null | { assignee: string; reason: string }>(null);
+
   // Tick every 30s so the countdown re-renders without a full data refresh
   const [, setNow] = useState(0);
   useEffect(() => { const t = setInterval(() => setNow(n => n + 1), 30000); return () => clearInterval(t); }, []);
