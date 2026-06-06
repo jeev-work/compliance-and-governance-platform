@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useFilters } from '@/lib/filterContext';
-import { SYSTEM_SPOC_MAP, KPIRow, RagState } from '@/lib/mockData';
+import { SYSTEM_SPOC_MAP, KPIRow, RagState, getContactPhone } from '@/lib/mockData';
 import { cn, CHART_TOOLTIP } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
