@@ -275,10 +275,25 @@ export function generateMockData(count = 30000): KPIRow[] {
       stateFlags.push('Unconfigured');
     }
 
-    const slaVersion = `SLA_v1.${Math.floor(rand() * 4)}`;
+    const versionIdx = Math.floor(rand() * 4);
+    const slaVersion = `SLA_v1.${versionIdx}`;
+    // Build per-KPI lifetime SLA history — every prior version this KPI ran under.
+    const slaHistory: SlaVersionRecord[] = [];
+    const notes = ['Initial baseline', 'Tightened API latency 500→400ms', 'Added debounce 3m', 'Festival peak contextual profile'];
+    const owners = ['M. Patel', 'L. Zhang', 'D. Okafor', 'S. Kumar'];
+    for (let v = 0; v <= versionIdx; v++) {
+      slaHistory.push({
+        version: `SLA_v1.${v}`,
+        activeFrom: `2026-0${v + 1}-01T00:00:00.000Z`,
+        changedBy: owners[v % owners.length],
+        threshold: parseFloat((0.08 - v * 0.01).toFixed(3)),
+        changeNote: notes[v] ?? `Refinement v1.${v}`,
+      });
+    }
     const chaseTimeline = status === 'BREACHED'
       ? makeChaseTimeline(rand, ts, resolutionStatus, !!dependency)
       : [];
+
 
     rows.push({
       id: `KPI-${10000 + i}`,
