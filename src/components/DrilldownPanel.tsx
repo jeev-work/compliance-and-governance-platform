@@ -419,10 +419,12 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
               {row.escalations.map((esc, i) => (
                 <div key={i} className="flex items-start gap-2 text-[10px] border-l-2 border-rag-amber/50 pl-2">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-foreground">{esc.from}</span>
+                      <ContactPhone name={esc.from} />
                       <span className="text-muted-foreground">→</span>
                       <span className="font-semibold rag-amber">{esc.to}</span>
+                      <ContactPhone name={esc.to} />
                     </div>
                     <div className="text-muted-foreground">{esc.reason}</div>
                   </div>
