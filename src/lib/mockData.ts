@@ -80,7 +80,9 @@ export type KPIRow = {
   breaches: number;
   failureRate: number;
   targetSLA: number;
-  slaVersion: string;      // SLA Configuration Vault version (Blueprint §1 Layer 3)
+  slaVersion: string;      // SLA Configuration Vault version (Blueprint §1 Layer 3) — pointer to active record
+  slaHistory: SlaVersionRecord[];  // per-KPI version trail, oldest → newest, last = currently active
+  configSnapshotId: string;        // snapshot id (== slaVersion) active when this row was evaluated
   ragState: RagState;
   status: 'BREACHED' | 'CLEAN';
   resolutionStatus: 'Clean' | 'Investigating' | 'Open' | 'Escalated to HOD' | 'Resolved' | 'Verifying';
@@ -111,6 +113,7 @@ export const SYSTEM_SPOC_MAP: Record<string, { name: string; role: string; email
   'Data Warehouse':  { name: 'A. Williams', role: 'Risk Analyst · DWH SPOC',          email: 'a.williams@gov.demo', phone: '+1-555-0266', teams: '@awilliams' },
   'Auth Engine':     { name: 'M. Patel',    role: 'Compliance Lead · Auth SPOC',      email: 'm.patel@gov.demo',    phone: '+1-555-0299', teams: '@mpatel' },
 };
+
 
 function seeded(seed: number) {
   let s = seed;
