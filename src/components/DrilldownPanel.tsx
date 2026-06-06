@@ -447,6 +447,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-foreground">{c.author}</span>
+                      <ContactPhone name={c.author} />
                       <span className="text-muted-foreground">·</span>
                       <span className="text-muted-foreground">{c.role}</span>
                     </div>
