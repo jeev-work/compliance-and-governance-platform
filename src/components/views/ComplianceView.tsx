@@ -3,9 +3,10 @@ import { useFilters } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
 import { FileWarning, CheckCircle2, Search, AlertOctagon, Clock, ArrowUpRight, FileDown, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { exportMasterLedger, exportMicroLedger } from '@/lib/exportLedger';
 
 export function ComplianceView() {
-  const { filteredData, openDrilldown } = useFilters();
+  const { filteredData, openDrilldown, masterLedger, configSnapshots } = useFilters();
   const [query, setQuery] = useState('');
 
   const breachRows = useMemo(() => filteredData.filter(r => r.status === 'BREACHED'), [filteredData]);
@@ -42,6 +43,17 @@ export function ComplianceView() {
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-[10px] text-muted-foreground italic mr-auto">
+          Exports stamp every entry with the SLA config snapshot active at incident time — never the current config.
+        </span>
+        <button
+          onClick={() => { exportMasterLedger(masterLedger, configSnapshots); toast.success('Master ledger exported · snapshot-stamped'); }}
+          className="text-[10px] font-semibold px-2 py-1 rounded border bg-rag-amber border-rag-amber rag-amber hover:opacity-80 flex items-center gap-1"
+        >
+          <FileDown className="h-3 w-3" /> Export Master Ledger
+        </button>
+      </div>
       {/* KPI tiles */}
       <div className="grid grid-cols-6 gap-2">
         <KPI icon={FileWarning} label="Total Exceptions" value={metrics.total} />
@@ -96,7 +108,7 @@ export function ComplianceView() {
                   <td className="px-2 py-1 font-mono text-[10px] text-muted-foreground">{r.auditLedgerId}</td>
                   <td className="px-2 py-1 text-[10px]">{r.resolutionStatus}</td>
                   <td className="px-2 py-1 text-right" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => toast.success(`Exported · hash ${r.auditLedgerId}`)}
+                    <button onClick={() => { exportMicroLedger({ kind: 'kpi', name: r.id }, r.ledgerEntries, configSnapshots, r); toast.success(`Micro ledger exported · ${r.id}`); }}
                       className="text-[10px] text-primary hover:underline flex items-center gap-1 ml-auto">
                       <FileDown className="h-3 w-3" /> Export
                     </button>

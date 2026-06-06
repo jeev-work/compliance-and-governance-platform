@@ -32,6 +32,16 @@ const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Se
 /** Five-state governance status per Blueprint §1 Layer 3 */
 export type RagState = 'GREEN' | 'AMBER' | 'RED' | 'GREY' | 'BLUE' | 'UNCONFIGURED';
 
+/** Short 3-letter labels — GRE collision between GREEN/GREY fixed: GRN vs GRY. */
+export const RAG_SHORT: Record<RagState, string> = {
+  GREEN: 'GRN',
+  AMBER: 'AMB',
+  RED:   'RED',
+  GREY:  'GRY',
+  BLUE:  'BLU',
+  UNCONFIGURED: 'UNC',
+};
+
 /** Operational state flags exposed in the universal filter ribbon */
 export type StateFlag =
   | 'Acknowledged' | 'Unacknowledged' | 'Escalated'
@@ -48,6 +58,16 @@ export type ChaseEvent = { step: ChaseStep; timestamp: string; actor: string };
 export type DependencyFork = { team: string; timestamp: string; linkedId: string; status: 'open' | 'resolved' };
 export type LedgerEntry = { timestamp: string; actor: string; action: string; hash: string; details?: string };
 
+/** Per-KPI SLA version history — each KPI carries its own threshold trail. */
+export type SlaVersionRecord = {
+  version: string;
+  activeFrom: string;
+  changedBy: string;
+  threshold: number;     // e.g. 0.05 = 5% failure-rate ceiling
+  changeNote: string;
+};
+
+
 export type KPIRow = {
   id: string;
   date: string;            // ISO date
@@ -60,7 +80,9 @@ export type KPIRow = {
   breaches: number;
   failureRate: number;
   targetSLA: number;
-  slaVersion: string;      // SLA Configuration Vault version (Blueprint §1 Layer 3)
+  slaVersion: string;      // SLA Configuration Vault version (Blueprint §1 Layer 3) — pointer to active record
+  slaHistory: SlaVersionRecord[];  // per-KPI version trail, oldest → newest, last = currently active
+  configSnapshotId: string;        // snapshot id (== slaVersion) active when this row was evaluated
   ragState: RagState;
   status: 'BREACHED' | 'CLEAN';
   resolutionStatus: 'Clean' | 'Investigating' | 'Open' | 'Escalated to HOD' | 'Resolved' | 'Verifying';
@@ -91,6 +113,7 @@ export const SYSTEM_SPOC_MAP: Record<string, { name: string; role: string; email
   'Data Warehouse':  { name: 'A. Williams', role: 'Risk Analyst · DWH SPOC',          email: 'a.williams@gov.demo', phone: '+1-555-0266', teams: '@awilliams' },
   'Auth Engine':     { name: 'M. Patel',    role: 'Compliance Lead · Auth SPOC',      email: 'm.patel@gov.demo',    phone: '+1-555-0299', teams: '@mpatel' },
 };
+
 
 function seeded(seed: number) {
   let s = seed;
@@ -252,10 +275,25 @@ export function generateMockData(count = 30000): KPIRow[] {
       stateFlags.push('Unconfigured');
     }
 
-    const slaVersion = `SLA_v1.${Math.floor(rand() * 4)}`;
+    const versionIdx = Math.floor(rand() * 4);
+    const slaVersion = `SLA_v1.${versionIdx}`;
+    // Build per-KPI lifetime SLA history — every prior version this KPI ran under.
+    const slaHistory: SlaVersionRecord[] = [];
+    const notes = ['Initial baseline', 'Tightened API latency 500→400ms', 'Added debounce 3m', 'Festival peak contextual profile'];
+    const owners = ['M. Patel', 'L. Zhang', 'D. Okafor', 'S. Kumar'];
+    for (let v = 0; v <= versionIdx; v++) {
+      slaHistory.push({
+        version: `SLA_v1.${v}`,
+        activeFrom: `2026-0${v + 1}-01T00:00:00.000Z`,
+        changedBy: owners[v % owners.length],
+        threshold: parseFloat((0.08 - v * 0.01).toFixed(3)),
+        changeNote: notes[v] ?? `Refinement v1.${v}`,
+      });
+    }
     const chaseTimeline = status === 'BREACHED'
       ? makeChaseTimeline(rand, ts, resolutionStatus, !!dependency)
       : [];
+
 
     rows.push({
       id: `KPI-${10000 + i}`,
@@ -270,6 +308,8 @@ export function generateMockData(count = 30000): KPIRow[] {
       failureRate,
       targetSLA: 0.05,
       slaVersion,
+      slaHistory,
+      configSnapshotId: slaVersion,
       ragState,
       status,
       resolutionStatus,

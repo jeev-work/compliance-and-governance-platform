@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, ReactNode, useCallback } from 'react';
-import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag } from './mockData';
+import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag, LedgerEntry, SlaVersionRecord } from './mockData';
 
 export type Role = 'executive' | 'lobManager' | 'spoc' | 'compliance' | 'analyst' | 'admin';
 
@@ -20,15 +20,28 @@ export type FilterState = {
 };
 
 type DrilldownState = {
-  type: 'system' | 'process' | 'lob' | 'breach' | null;
-  value: string | null;
+  type: 'system' | 'process' | 'lob' | 'breach' | 'matrixCell' | null;
+  value: string | null;          // for matrixCell: "system||process"
   row: KPIRow | null;
 };
 
 export type HistoryView = {
   pivot: KPIRow;
-  rows: KPIRow[]; // all rows sharing (system, process, lob), sorted asc by timestamp
+  rows: KPIRow[];
 } | null;
+
+export type ConfigSnapshot = {
+  id: string;                    // snapshot id (e.g. SLA_v1.3)
+  capturedAt: string;
+  thresholds: Record<string, number>;  // KPI-id → threshold at snapshot time
+  ragRules: string;              // human-readable summary
+};
+
+export type Registries = {
+  lobs: string[];
+  systems: string[];
+  processes: string[];
+};
 
 type Ctx = {
   filters: FilterState;
@@ -39,8 +52,30 @@ type Ctx = {
   drilldown: DrilldownState;
   openDrilldown: (type: DrilldownState['type'], value: string | null, row?: KPIRow | null) => void;
   closeDrilldown: () => void;
-  /** In-memory mutation for demo actions (acknowledge / deploy / exec flag / fork) */
   mutateRow: (id: string, patch: Partial<KPIRow>) => void;
+
+  // Admin authoring
+  registries: Registries;
+  addLob: (name: string, actor: string) => void;
+  addSystem: (name: string, actor: string) => void;
+  addKpi: (input: AddKpiInput, actor: string) => void;
+
+  // Ledgers + config integrity
+  masterLedger: LedgerEntry[];
+  lobLedgers: Record<string, LedgerEntry[]>;
+  systemLedgers: Record<string, LedgerEntry[]>;
+  configSnapshots: ConfigSnapshot[];
+};
+
+export type AddKpiInput = {
+  lob: string;
+  system: string;
+  process: string;
+  source: string;
+  targetSLA: number;
+  severity: Severity;
+  spoc: string;
+  configFile: string;
 };
 
 const FilterContext = createContext<Ctx | null>(null);
@@ -50,9 +85,8 @@ export function useFilters() {
   return c;
 }
 
-// Generate once
 const seedData = generateMockData(30000);
-const BASELINE = new Date(2026, 4, 14); // matches mockData
+const BASELINE = new Date(2026, 4, 14);
 
 function presetToCutoff(p: DatePreset): Date {
   const d = new Date(BASELINE.getTime());
@@ -65,6 +99,16 @@ function presetToCutoff(p: DatePreset): Date {
     case '90D': d.setDate(d.getDate() - 90);  break;
   }
   return d;
+}
+
+function fakeHash(prefix = 'LDG') {
+  const hex = 'abcdef0123456789';
+  let h = '';
+  for (let i = 0; i < 16; i++) h += hex[Math.floor(Math.random() * 16)];
+  return `${prefix}-${h}`;
+}
+function newEntry(action: string, actor: string, details?: string): LedgerEntry {
+  return { timestamp: new Date().toISOString(), actor, action, hash: fakeHash('LDG'), details };
 }
 
 export function FilterProvider({ children }: { children: ReactNode }) {
@@ -84,15 +128,107 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   });
   const [drilldown, setDrilldown] = useState<DrilldownState>({ type: null, value: null, row: null });
 
+  const [registries, setRegistries] = useState<Registries>({
+    lobs: [...FILTER_OPTIONS.LOBS],
+    systems: [...FILTER_OPTIONS.SYSTEMS],
+    processes: [...FILTER_OPTIONS.PROCESSES],
+  });
+
+  const [masterLedger, setMasterLedger] = useState<LedgerEntry[]>([
+    newEntry('Platform Initialized', 'System', `${seedData.length.toLocaleString()} KPIs hydrated`),
+  ]);
+  const [lobLedgers, setLobLedgers] = useState<Record<string, LedgerEntry[]>>({});
+  const [systemLedgers, setSystemLedgers] = useState<Record<string, LedgerEntry[]>>({});
+
+  const [configSnapshots, setConfigSnapshots] = useState<ConfigSnapshot[]>(() => {
+    const versions = ['SLA_v1.0', 'SLA_v1.1', 'SLA_v1.2', 'SLA_v1.3'];
+    return versions.map((v, i) => ({
+      id: v,
+      capturedAt: `2026-0${i + 1}-01T00:00:00.000Z`,
+      thresholds: {},
+      ragRules: ['Initial baseline thresholds',
+                 'Tightened API latency 500→400ms',
+                 'Added KYC failure debounce 3m',
+                 'Festival peak contextual profile'][i],
+    }));
+  });
+
   const openDrilldown = useCallback((type: DrilldownState['type'], value: string | null, row?: KPIRow | null) => {
     setDrilldown({ type, value, row: row ?? null });
   }, []);
   const closeDrilldown = useCallback(() => setDrilldown({ type: null, value: null, row: null }), []);
 
+  const appendMaster = useCallback((e: LedgerEntry) => setMasterLedger(prev => [...prev, e]), []);
+
   const mutateRow = useCallback((id: string, patch: Partial<KPIRow>) => {
     setAllData(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
     setDrilldown(d => d.row && d.row.id === id ? { ...d, row: { ...d.row, ...patch } as KPIRow } : d);
   }, []);
+
+  const addLob = useCallback((name: string, actor: string) => {
+    if (!name || registries.lobs.includes(name)) return;
+    setRegistries(r => ({ ...r, lobs: [...r.lobs, name] }));
+    const e = newEntry('LoB Created', actor, `name=${name}`);
+    setLobLedgers(prev => ({ ...prev, [name]: [e] }));
+    appendMaster(e);
+  }, [registries.lobs, appendMaster]);
+
+  const addSystem = useCallback((name: string, actor: string) => {
+    if (!name || registries.systems.includes(name)) return;
+    setRegistries(r => ({ ...r, systems: [...r.systems, name] }));
+    const e = newEntry('System / Department Created', actor, `name=${name}`);
+    setSystemLedgers(prev => ({ ...prev, [name]: [e] }));
+    appendMaster(e);
+  }, [registries.systems, appendMaster]);
+
+  const addKpi = useCallback((input: AddKpiInput, actor: string) => {
+    const id = `KPI-${90000 + Math.floor(Math.random() * 9999)}`;
+    const ts = new Date().toISOString();
+    const snapshotId = configSnapshots[configSnapshots.length - 1]?.id ?? 'SLA_v1.0';
+    const initialHistory: SlaVersionRecord[] = [{
+      version: snapshotId,
+      activeFrom: ts,
+      changedBy: actor,
+      threshold: input.targetSLA,
+      changeNote: `Initial config · file=${input.configFile} · SPOC=${input.spoc}`,
+    }];
+    const ledger: LedgerEntry[] = [
+      newEntry('KPI Created', actor, `id=${id} · LoB=${input.lob} · system=${input.system} · process=${input.process} · target=${input.targetSLA} · file=${input.configFile}`),
+    ];
+    const row: KPIRow = {
+      id, date: ts.slice(0, 10), timestamp: ts,
+      lob: input.lob as any, system: input.system, process: input.process,
+      source: input.source, baseVolume: 0, breaches: 0, failureRate: 0,
+      targetSLA: input.targetSLA, slaVersion: snapshotId, slaHistory: initialHistory,
+      configSnapshotId: snapshotId,
+      ragState: 'UNCONFIGURED', status: 'CLEAN', resolutionStatus: 'Clean',
+      stateFlags: ['Unconfigured'],
+      assignee: { name: input.spoc, role: 'KPI SPOC' },
+      escalations: [], comments: [], chaseTimeline: [], dependency: null,
+      executiveFlag: false, auditLedgerId: fakeHash('LDG'),
+      maintenanceWindow: null,
+      timeToDetectMin: null, timeToEscalateMin: null, timeToResolveMin: null,
+      resolvedBy: null, severity: input.severity, riskScore: 0,
+      ledgerEntries: ledger,
+    };
+    setAllData(prev => [row, ...prev]);
+    // Ensure registry contains LoB/system
+    setRegistries(r => ({
+      ...r,
+      lobs: r.lobs.includes(input.lob) ? r.lobs : [...r.lobs, input.lob],
+      systems: r.systems.includes(input.system) ? r.systems : [...r.systems, input.system],
+      processes: r.processes.includes(input.process) ? r.processes : [...r.processes, input.process],
+    }));
+    setLobLedgers(prev => ({
+      ...prev,
+      [input.lob]: [...(prev[input.lob] ?? []), newEntry('KPI Attached', actor, `→ ${id}`)],
+    }));
+    setSystemLedgers(prev => ({
+      ...prev,
+      [input.system]: [...(prev[input.system] ?? []), newEntry('KPI Attached', actor, `→ ${id}`)],
+    }));
+    appendMaster(newEntry('KPI Created', actor, `${id} · ${input.lob}/${input.system}/${input.process} · snapshot=${snapshotId}`));
+  }, [configSnapshots, appendMaster]);
 
   const filteredData = useMemo(() => {
     const cutoffStart = filters.datePreset === 'CUSTOM' && filters.customFrom
@@ -121,8 +257,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     });
   }, [filters, allData]);
 
-  // History view: triggered when search query exactly matches a KPI id (case-insensitive).
-  // Returns ALL rows in allData sharing (system, process, lob) — the API's lifetime trail.
   const historyView = useMemo<HistoryView>(() => {
     const q = filters.searchQuery.trim().toLowerCase();
     if (!q.startsWith('kpi-')) return null;
@@ -135,7 +269,12 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   }, [filters.searchQuery, allData]);
 
   return (
-    <FilterContext.Provider value={{ filters, setFilters, filteredData, allData, historyView, drilldown, openDrilldown, closeDrilldown, mutateRow }}>
+    <FilterContext.Provider value={{
+      filters, setFilters, filteredData, allData, historyView,
+      drilldown, openDrilldown, closeDrilldown, mutateRow,
+      registries, addLob, addSystem, addKpi,
+      masterLedger, lobLedgers, systemLedgers, configSnapshots,
+    }}>
       {children}
     </FilterContext.Provider>
   );

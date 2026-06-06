@@ -1,66 +1,55 @@
-## 1. Fix dark-on-dark chart tooltips (all views)
+## 1. LoB Manager · Clickable RAG matrix tiles
 
-Every `<Tooltip contentStyle={...}>` currently uses `background: 'hsl(222 44% 8%)'` and inherits dark text — values become illegible on the dark card.
+`src/components/views/LobManagerView.tsx`
+- Each non-empty matrix cell currently opens nothing concrete. Wire each cell to open a new drilldown type `'matrixCell'` carrying `{ system, process }`.
+- Extend `DrilldownState['type']` in `filterContext.tsx` to include `'matrixCell'`, and update `DrilldownPanel.tsx` to render a new "Cell KPI Status" view listing every KPI in that system×process intersection with its live RAG, assignee, escalation countdown, and a row click that opens the existing breach drilldown.
 
-Replace the inline `contentStyle` with semantic, readable tokens across every chart in:
-- `ExecutiveView` (pie, line, bar — 3 tooltips)
-- `AnalystView` (line + bar — 2 tooltips)
-- `LobManagerView`, `SpocView`, `ComplianceView`, `AdminHealthView`, `DrilldownPanel` group view
+## 2. Fix GRE/GRY collision across the app
 
-New shared style (extract a `CHART_TOOLTIP` constant in `src/lib/utils.ts`):
-```
-{
-  background: 'hsl(var(--popover))',
-  border: '1px solid hsl(var(--border))',
-  borderRadius: 6,
-  color: 'hsl(var(--popover-foreground))',
-  fontSize: 11,
-  boxShadow: '0 4px 12px hsl(0 0% 0% / 0.4)',
-}
-```
-Also pass `labelStyle={{ color: 'hsl(var(--foreground))' }}` and `itemStyle={{ color: 'hsl(var(--foreground))' }}` so series labels stay legible.
+Audit and rename the 3-letter RAG abbreviations everywhere they appear:
+- `GlobalFilterBar.tsx` chip labels — `GREEN → GRN`, `GREY → GRY` (currently both render `GRE`).
+- `LobManagerView.tsx` matrix cell label (`w.slice(0, 3)`) — replace with a `RAG_SHORT` map: `{GREEN:'GRN', AMBER:'AMB', RED:'RED', GREY:'GRY', BLUE:'BLU', UNCONFIGURED:'UNC'}`.
+- Search other views (`ExecutiveView`, `SpocView`, `AnalystView`, `AdminHealthView`, `KpiHistoryPanel`) for any `.slice(0,3)` or hard-coded "GRE" usages and replace with the same map.
+- Centralize the map in `src/lib/mockData.ts` (or `utils.ts`) as `export const RAG_SHORT` so it can't drift.
 
-## 2. Multi-Team Dependency — toggle Enable / Disable with confirm + ledger
+## 3. Per-KPI SLA version history
 
-In `DrilldownPanel.BreachDetail` (SPOC role):
+Today `slaVersion` is a single string per row and the vault in `AdminHealthView.tsx` aggregates by version across rows. Change the model so each KPI carries its own version trail.
 
-- Replace the single `Tag Multi-Team Dependency` button with a dynamic control:
-  - If `row.dependency == null`: button **"Enable Multi-Team Dependency"** → opens a small inline modal asking *which team to notify* (dropdown of `DEPENDENCY_TEAMS` from `mockData`) + optional reason. Confirm step: "Are you sure? This will pause the primary SLA timer." Cancel/Confirm.
-  - If `row.dependency != null`: button **"Disable Multi-Team Dependency"** (variant=amber) → confirm "Are you sure? Primary SLA timer will resume." Cancel/Confirm.
+`src/lib/mockData.ts`
+- Add `slaHistory: { version: string; activeFrom: string; changedBy: string; threshold: number; changeNote: string }[]` on `KPIRow`. Seed each row with 1–3 prior versions so the trail is non-empty.
+- Keep `slaVersion` as the current active pointer (last item in `slaHistory`).
 
-- On Enable confirm: `mutateRow` sets `dependency = { team, timestamp, linkedId: SUB-xxxxx, status: 'open' }`, appends `Cross-Functional` flag, AND appends a new entry to `row.comments` of role `'System · Ledger'` with text `Dependency ENABLED → ${team} · ledger ${row.auditLedgerId}-D${seq}`. Toast success.
-- On Disable confirm: `mutateRow` clears `dependency = null`, removes `Cross-Functional` flag, appends ledger comment `Dependency DISABLED · ledger ${row.auditLedgerId}-D${seq}`. Toast success.
+`AdminHealthView.tsx`
+- Replace the aggregated vault table with a two-pane layout: left = KPI search/picker (reuses `filteredData`), right = that KPI's full version history table (version, activeFrom, changedBy, threshold, note, currently-active badge).
+- Keep an "All versions in scope" summary chip strip above for the previous bird's-eye view.
 
-Both events also append a `ChaseEvent` (`{ step: 'Notified', actor: 'Dependency Toggle' }`) so the chase timeline reflects them, and the existing **Activity Log** card surfaces the ledger entry (acts as the immutable trail for the demo).
+`KpiHistoryPanel.tsx` — also surface the per-KPI SLA history alongside the existing malfunction history (gated by role as today).
 
-## 3. Global search → full KPI history view
+## 4. Admin authoring — KPIs, LoBs, departments
 
-Today, when the global search matches a `KPI-xxxxx` id, the row appears in the active view's table but its **per-KPI lifecycle** is only visible by clicking. We add a dedicated history surface:
+`AdminHealthView.tsx` (new "Authoring" tab/section)
+- Three "Add new…" dialogs: **KPI**, **LoB**, **Department/System**. Each writes into a new in-memory registry exposed by `filterContext.tsx` (`registries: { lobs, systems, kpis }` + `addLob`, `addSystem`, `addKpi`).
+- New KPI form fields: id (auto `KPI-…`), LoB, system, process, source, target SLA threshold, severity defaults, SPOC owner, attached config-file name (free text or upload stub).
+- On create, append a `LedgerEntry` to that KPI's `ledgerEntries` array (`action: 'KPI Created'`) and also write to a new top-level `masterLedger` (see §5).
+- Every new LoB / department gets its own independent ledger stored on a `lobLedgers: Record<string, LedgerEntry[]>` and `systemLedgers: Record<string, LedgerEntry[]>` in `filterContext`.
 
-- Extend `filterContext`: when `searchQuery` exactly matches one or more rows by `id` prefix `KPI-`, expose a derived `historyView = { id, rows: KPIRow[] }` — rows sorted by `timestamp asc` across `allData` (ignoring date filter), where any row shares the same `id`. Since each `KPI-id` is unique in mock, also include rows with the same `(system, process, lob)` triple — that is the "API's lifetime log".
-- New component `src/components/KpiHistoryPanel.tsx` rendered in `Index.tsx` above the role view whenever `historyView` is active (search bar shows a small "Showing lifetime history for KPI-xxxxx · clear" pill).
-- Panel contents:
-  - Header: KPI id, system/process/LoB, current RAG, current assignee + SPOC contact (name, role, email pattern `${first}.${last}@gov.demo`, on-call phone placeholder).
-  - **Performance strip** (always shown): sparkline of `failureRate` over time, count of total events, current SLA%, MTTR, MTTD.
-  - **Malfunction History timeline** (hidden for `analyst` role — see §4): chronological list of each historical breach with severity, RAG, resolutionStatus, assignee, actions taken (derived from each row's `chaseTimeline`, `escalations`, `comments`, `dependency`), and the ledger hash for that incident. Each entry expands to show the full chase timeline inline.
-  - "Open latest incident" button → `openDrilldown('breach', latestRow.id, latestRow)`.
+## 5. Master + micro ledger export with config-snapshot integrity
 
-## 4. Analyst / Generic Viewer scope
+`src/lib/filterContext.tsx`
+- Introduce `masterLedger: LedgerEntry[]` aggregating every mutation (already routed through `mutateRow`, plus the new admin authoring actions).
+- Add `configSnapshots: { version: string; capturedAt: string; thresholds: Record<string, number>; ragRules: ... }[]`. Each time an SLA threshold changes (admin authoring or a new `slaHistory` entry), snapshot the current rules.
+- Every `KPIRow` already carries `slaVersion`; persist alongside it the `configSnapshotId` that was active when the row was evaluated, so historic rows always reference the rules they were judged under.
 
-- In `KpiHistoryPanel`, gate the Malfunction History section behind `filters.role !== 'analyst'`. Analyst sees only the **Performance strip** + a **"SPOC Contact"** card with:
-  - SPOC name + role (from current assignee, or system-default mapping if null)
-  - Email + phone (mocked) + Teams handle
-  - "Request more details" button → `toast.success('Request sent to {SPOC}')` (no mutation)
-- In `AnalystView`, add a small footer note "For incident-level details, contact the system SPOC" and surface the system→SPOC mapping table (read from a new constant `SYSTEM_SPOC_MAP` in `mockData.ts` so the same data feeds both views).
+Export mechanism (new `src/lib/exportLedger.ts` helper, button in `AdminHealthView` and `ComplianceView`):
+- **Export Master Ledger** → CSV/JSON of `masterLedger` + the full `configSnapshots` table.
+- **Export Micro Ledger** → per-KPI / per-LoB / per-system download of that entity's `ledgerEntries`, each row stamped with its `configSnapshotId` and the snapshot's thresholds inlined.
+- Add an "Integrity guarantee" notice in the dialog: re-evaluation always uses the snapshot active at incident time, so RAG/breach counts in the export match the configuration of that moment, never the current config.
 
 ## Technical notes
 
-- New file: `src/components/KpiHistoryPanel.tsx`.
-- Edits: `src/lib/utils.ts` (add `CHART_TOOLTIP`), `src/lib/filterContext.tsx` (add `historyView` selector), `src/lib/mockData.ts` (add `SYSTEM_SPOC_MAP`), `src/pages/Index.tsx` (mount panel), `src/components/DrilldownPanel.tsx` (dependency toggle + confirm modal), and all 6 view files (swap tooltip styles).
-- No backend, no new types beyond optional `ledgerEntries?: {ts; text; hash}[]` on `KPIRow` if we want stronger separation than reusing `comments` — default is to reuse `comments` to keep the diff small. Confirm preference if you'd rather have a dedicated `ledgerEntries` array.
-
-## Out of scope
-
-- No real cryptographic hashing — ledger hashes stay mocked.
-- No backend/persistence — refresh resets state.
-- No animations beyond existing `exec-pulse`.
+- All new state lives in `FilterProvider` so existing `useFilters` consumers pick it up; no backend changes.
+- New drilldown type `'matrixCell'` requires a small switch in `DrilldownPanel.tsx`'s render block — reuse existing list styles.
+- The RAG short-label map is the single source of truth; remove every ad-hoc `slice(0,3)` to prevent regressions.
+- Export uses a client-side blob download (`Blob` + `URL.createObjectURL`), no server needed.
+- Ledger entries continue to use the existing `fakeHash`/`LedgerEntry` shape so the immutable-chain UX stays consistent.

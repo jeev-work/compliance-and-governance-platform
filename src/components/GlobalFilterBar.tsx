@@ -1,7 +1,7 @@
 import { useFilters, FILTER_OPTIONS, DatePreset } from '@/lib/filterContext';
 import { ROLE_LABEL } from '@/lib/rbac';
 import { Role } from '@/lib/filterContext';
-import { RagState, Severity, StateFlag } from '@/lib/mockData';
+import { RagState, Severity, StateFlag, RAG_SHORT } from '@/lib/mockData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -183,7 +183,7 @@ export function GlobalFilterBar() {
                 active ? RAG_COLORS[s] : 'bg-secondary border-border text-muted-foreground hover:text-foreground',
               )}
             >
-              {s === 'UNCONFIGURED' ? 'UNC' : s.slice(0, 3)}
+              {RAG_SHORT[s]}
             </button>
           );
         })}
