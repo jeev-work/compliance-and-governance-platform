@@ -156,6 +156,52 @@ function makeChaseTimeline(rand: () => number, baseTs: Date, resolution: KPIRow[
   return events;
 }
 
+function makeLedgerFromChase(
+  rand: () => number,
+  chase: ChaseEvent[],
+  ragState: RagState,
+  severity: Severity,
+  assigneeName: string,
+  dependency: boolean,
+  executiveFlag: boolean,
+): LedgerEntry[] {
+  const entries: LedgerEntry[] = [];
+  chase.forEach((ev) => {
+    const base = { timestamp: ev.timestamp, hash: fakeHash(rand, 'LDG') };
+    switch (ev.step) {
+      case 'Generated':
+        entries.push({ ...base, actor: 'System', action: 'Ticket Generated', details: `RAG=${ragState} · sev=${severity}` });
+        break;
+      case 'Notified':
+        if (/Dependency/i.test(ev.actor)) {
+          entries.push({ ...base, actor: 'SPOC · System', action: 'Multi-Team Dependency ENABLED', details: ev.actor });
+        } else if (/Executive reassign/i.test(ev.actor)) {
+          entries.push({ ...base, actor: 'Executive', action: 'EXECUTIVE FLAG raised', details: 'SLA timer nullified · Level 2 escalation' });
+          entries.push({ ...base, hash: fakeHash(rand, 'LDG'), actor: 'Executive', action: 'Reassigned by Executive', details: ev.actor.replace(/^Executive reassign → /, '→ ') });
+        } else {
+          entries.push({ ...base, actor: 'Notifier Bot', action: 'Notified', details: `SPOC=${assigneeName}` });
+        }
+        break;
+      case 'Acknowledged':
+        entries.push({ ...base, actor: `SPOC · ${ev.actor.replace(/ \(.*\)$/, '')}`, action: 'Acknowledged', details: dependency ? 'Chase timer halted · dependency fork open' : 'Chase timer halted' });
+        break;
+      case 'Resolved':
+        entries.push({ ...base, actor: `SPOC · ${ev.actor}`, action: 'Resolution Deployed', details: 'RCA submitted · awaiting telemetry' });
+        break;
+      case 'Verifying':
+        entries.push({ ...base, actor: 'System · Telemetry', action: 'Verifying Fix', details: 'Validation hold (3 polling cycles)' });
+        break;
+      case 'Closed':
+        entries.push({ ...base, actor: 'System · Telemetry', action: 'Ticket Closed', details: 'RAG returned to GREEN' });
+        break;
+    }
+  });
+  if (executiveFlag && !entries.some(e => e.action.includes('EXECUTIVE'))) {
+    entries.splice(1, 0, { timestamp: chase[0]?.timestamp ?? new Date().toISOString(), actor: 'Executive', action: 'EXECUTIVE FLAG raised', hash: fakeHash(rand, 'LDG'), details: 'SLA timer nullified · Level 2 escalation' });
+  }
+  return entries;
+}
+
 function pickRagState(rand: () => number): RagState {
   const r = rand();
   if (r < 0.78) return 'GREEN';
@@ -360,9 +406,7 @@ export function generateMockData(count = 30000): KPIRow[] {
       resolvedBy,
       severity,
       riskScore,
-      ledgerEntries: [
-        { timestamp: ts.toISOString(), actor: 'System', action: 'KPI Generated', hash: fakeHash(rand, 'LDG'), details: `RAG=${ragState} · sev=${severity}` },
-      ],
+      ledgerEntries: makeLedgerFromChase(rand, chaseTimeline, ragState, severity, assignee.name, !!dependency, !!executiveFlag),
     });
   }
 
