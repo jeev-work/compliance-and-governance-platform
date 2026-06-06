@@ -1,14 +1,31 @@
 import { useFilters } from '@/lib/filterContext';
-import { ChaseStep, KPIRow, RagState, LedgerEntry } from '@/lib/mockData';
+import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone } from '@/lib/mockData';
 import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer,
+  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer, Phone,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
+
+/** Inline contact phone badge — shown next to any displayed person name. */
+function ContactPhone({ name }: { name: string | null | undefined }) {
+  const phone = getContactPhone(name);
+  if (!phone) return null;
+  return (
+    <a
+      href={`tel:${phone.replace(/[^+\d]/g, '')}`}
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex items-center gap-0.5 font-mono text-muted-foreground hover:text-primary"
+      title={`Call ${name}`}
+    >
+      <Phone className="h-2.5 w-2.5" />{phone}
+    </a>
+  );
+}
+
 
 const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Security Eng', 'Cloud Platform'];
 const ASSIGNEE_POOL = [
@@ -108,7 +125,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
                 {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
                 <span className="ml-auto text-muted-foreground">{r.resolutionStatus}</span>
-                {r.assignee && <span className="text-muted-foreground">→ {r.assignee.name}</span>}
+                {r.assignee && <span className="text-muted-foreground">→ {r.assignee.name} <ContactPhone name={r.assignee.name} /></span>}
                 {r.status === 'BREACHED' && (
                   <span className={cn('flex items-center gap-1 font-semibold ml-1', toneClass)}>
                     <Timer className="h-2.5 w-2.5" /> {c.label}
@@ -386,7 +403,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
             <User className="h-3.5 w-3.5 text-primary" />
             <div>
               <div className="text-[9px] text-muted-foreground uppercase">Assignee</div>
-              <div className="text-xs font-semibold">{row.assignee?.name || '—'}</div>
+              <div className="text-xs font-semibold flex items-center gap-1.5">{row.assignee?.name || '—'} <ContactPhone name={row.assignee?.name} /></div>
               {row.assignee && <div className="text-[9px] text-muted-foreground">{row.assignee.role}</div>}
             </div>
           </div>
@@ -402,10 +419,12 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
               {row.escalations.map((esc, i) => (
                 <div key={i} className="flex items-start gap-2 text-[10px] border-l-2 border-rag-amber/50 pl-2">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-foreground">{esc.from}</span>
+                      <ContactPhone name={esc.from} />
                       <span className="text-muted-foreground">→</span>
                       <span className="font-semibold rag-amber">{esc.to}</span>
+                      <ContactPhone name={esc.to} />
                     </div>
                     <div className="text-muted-foreground">{esc.reason}</div>
                   </div>
@@ -428,6 +447,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-foreground">{c.author}</span>
+                      <ContactPhone name={c.author} />
                       <span className="text-muted-foreground">·</span>
                       <span className="text-muted-foreground">{c.role}</span>
                     </div>
@@ -589,7 +609,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
             {execModal.step === 'form' && (
               <div className="p-4 space-y-3">
                 <div className="text-[10px] text-muted-foreground">
-                  Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span>
+                  Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span> <ContactPhone name={row.assignee?.name} />
                 </div>
                 <div>
                   <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reassign To</label>
@@ -746,7 +766,7 @@ function GroupDrilldown({ type, value, rows, onClose, onSelectBreach }: {
                 <span className="font-mono rag-red">{row.breaches} breaches</span>
                 {row.executiveFlag && <ShieldAlert className="h-3 w-3 rag-red" />}
                 <span className="ml-auto text-muted-foreground">{row.resolutionStatus}</span>
-                {row.assignee && <span className="text-muted-foreground">→ {row.assignee.name}</span>}
+                {row.assignee && <span className="text-muted-foreground">→ {row.assignee.name} <ContactPhone name={row.assignee.name} /></span>}
               </div>
             ))}
             {breached.length > 50 && <div className="text-center text-[10px] text-muted-foreground py-1">+{breached.length - 50} more</div>}

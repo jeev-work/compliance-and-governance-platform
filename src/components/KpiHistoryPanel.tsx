@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useFilters } from '@/lib/filterContext';
-import { SYSTEM_SPOC_MAP, KPIRow, RagState } from '@/lib/mockData';
+import { SYSTEM_SPOC_MAP, KPIRow, RagState, getContactPhone } from '@/lib/mockData';
 import { cn, CHART_TOOLTIP } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
@@ -185,7 +185,7 @@ function MalfunctionHistory({ rows, openLatest }: { rows: KPIRow[]; openLatest: 
                 {b.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {b.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
                 <span className="ml-auto text-muted-foreground">{b.resolutionStatus}</span>
-                {b.assignee && <span className="text-muted-foreground">→ {b.assignee.name}</span>}
+                {b.assignee && <span className="text-muted-foreground">→ {b.assignee.name}{getContactPhone(b.assignee.name) && <span className="ml-1 font-mono">· {getContactPhone(b.assignee.name)}</span>}</span>}
               </button>
 
               {isOpen && (

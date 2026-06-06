@@ -8,18 +8,28 @@ const SYSTEMS = ['Core Banking', 'Payment Gateway', 'CRM', 'Document Cloud', 'Da
 const PROCESSES = ['KYC Verification', 'API Uptime', 'Ledger Sync', 'AML Screening', 'Ticket Routing', 'DB Backup'] as const;
 const SOURCES = ['AppDynamics', 'Datadog', 'Splunk', 'New Relic'] as const;
 
-const ASSIGNEES = [
-  { name: 'J. Chen', role: 'Sr. Engineer' },
-  { name: 'M. Patel', role: 'Compliance Lead' },
-  { name: 'S. Kumar', role: 'DevOps Manager' },
-  { name: 'A. Williams', role: 'Risk Analyst' },
-  { name: 'R. Thompson', role: 'IT Support Lead' },
-  { name: 'K. Garcia', role: 'Security Architect' },
-  { name: 'L. Zhang', role: 'VP Engineering' },
-  { name: 'D. Okafor', role: 'Head of Compliance' },
-  { name: 'P. Novak', role: 'CTO' },
-  { name: 'E. Santos', role: 'Audit Manager' },
+export const ASSIGNEES = [
+  { name: 'J. Chen',     role: 'Sr. Engineer',        phone: '+1-555-0142' },
+  { name: 'M. Patel',    role: 'Compliance Lead',     phone: '+1-555-0299' },
+  { name: 'S. Kumar',    role: 'DevOps Manager',      phone: '+1-555-0188' },
+  { name: 'A. Williams', role: 'Risk Analyst',        phone: '+1-555-0266' },
+  { name: 'R. Thompson', role: 'IT Support Lead',     phone: '+1-555-0211' },
+  { name: 'K. Garcia',   role: 'Security Architect',  phone: '+1-555-0247' },
+  { name: 'L. Zhang',    role: 'VP Engineering',      phone: '+1-555-0312' },
+  { name: 'D. Okafor',   role: 'Head of Compliance',  phone: '+1-555-0334' },
+  { name: 'P. Novak',    role: 'CTO',                 phone: '+1-555-0356' },
+  { name: 'E. Santos',   role: 'Audit Manager',       phone: '+1-555-0378' },
 ];
+
+/** Lookup phone number for any person displayed in the UI (assignees + SPOCs). */
+export function getContactPhone(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const clean = name.replace(/\s*\(.*?\)\s*$/, '').trim();
+  const a = ASSIGNEES.find(x => x.name === clean);
+  if (a) return a.phone;
+  const s = Object.values(SYSTEM_SPOC_MAP).find(x => x.name === clean);
+  return s?.phone ?? null;
+}
 
 const CAUSES = [
   'timeout in upstream service', 'database connection pool exhaustion',

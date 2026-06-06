@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { cn, escalationCountdown } from '@/lib/utils';
 import { Users, AlertCircle, ArrowUpRight, GitFork, Clock, Flag } from 'lucide-react';
-import { RagState, RAG_SHORT } from '@/lib/mockData';
+import { RagState, RAG_SHORT, getContactPhone } from '@/lib/mockData';
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green border-rag-green',
@@ -132,7 +132,7 @@ export function LobManagerView() {
                   </div>
                   <div className="text-muted-foreground mt-0.5">{r.system} · {r.process}</div>
                   <div className="flex items-center justify-between mt-0.5">
-                    <span className="text-muted-foreground">{r.lob} · {r.assignee?.name || 'unassigned'}</span>
+                    <span className="text-muted-foreground">{r.lob} · {r.assignee?.name || 'unassigned'}{r.assignee && getContactPhone(r.assignee.name) && <span className="ml-1 font-mono">· {getContactPhone(r.assignee.name)}</span>}</span>
                     <span className={cn('flex items-center gap-1 font-semibold', toneClass)}>
                       <Clock className="h-2.5 w-2.5" /> {c.label}
                     </span>

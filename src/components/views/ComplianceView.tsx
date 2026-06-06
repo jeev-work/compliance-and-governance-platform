@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { FileWarning, CheckCircle2, Search, AlertOctagon, Clock, ArrowUpRight, FileDown, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportMasterLedger, exportMicroLedger } from '@/lib/exportLedger';
+import { getContactPhone } from '@/lib/mockData';
 
 export function ComplianceView() {
   const { filteredData, openDrilldown, masterLedger, configSnapshots } = useFilters();
@@ -149,7 +150,7 @@ export function ComplianceView() {
                     <div className="text-muted-foreground mt-0.5">{row.process} · {row.lob}</div>
                     <div className="flex items-center justify-between mt-0.5">
                       <span className={cn('font-mono', `rag-${col.color}`)}>{row.breaches} br</span>
-                      {row.assignee && <span className="text-muted-foreground">{row.assignee.name}</span>}
+                      {row.assignee && <span className="text-muted-foreground">{row.assignee.name}{getContactPhone(row.assignee.name) && <span className="ml-1 font-mono">· {getContactPhone(row.assignee.name)}</span>}</span>}
                     </div>
                   </div>
                 ))}
