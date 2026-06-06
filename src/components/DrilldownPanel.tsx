@@ -125,7 +125,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
                 {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
                 <span className="ml-auto text-muted-foreground">{r.resolutionStatus}</span>
-                {r.assignee && <span className="text-muted-foreground">→ {r.assignee.name}</span>}
+                {r.assignee && <span className="text-muted-foreground">→ {r.assignee.name} <ContactPhone name={r.assignee.name} /></span>}
                 {r.status === 'BREACHED' && (
                   <span className={cn('flex items-center gap-1 font-semibold ml-1', toneClass)}>
                     <Timer className="h-2.5 w-2.5" /> {c.label}
