@@ -671,18 +671,24 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
   );
 }
 
-function ActionBtn({ icon: Icon, label, onClick, variant = 'default' }: {
+function ActionBtn({ icon: Icon, label, onClick, variant = 'default', disabled = false, disabledLabel }: {
   icon: any; label: string; onClick: () => void; variant?: 'default' | 'primary' | 'danger' | 'amber';
+  disabled?: boolean; disabledLabel?: string;
 }) {
   return (
-    <button onClick={onClick} className={cn(
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={disabled && disabledLabel ? disabledLabel : undefined}
+      className={cn(
       'flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded border transition-colors',
       variant === 'default' && 'bg-secondary border-border hover:bg-accent text-foreground',
       variant === 'primary' && 'bg-primary/15 border-primary/40 text-primary hover:bg-primary/25',
       variant === 'danger'  && 'bg-rag-red border-rag-red rag-red hover:bg-destructive/25',
       variant === 'amber'   && 'bg-rag-amber border-rag-amber rag-amber',
+      disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
     )}>
-      <Icon className="h-3 w-3" /> {label}
+      <Icon className="h-3 w-3" /> {disabled && disabledLabel ? disabledLabel : label}
     </button>
   );
 }
