@@ -609,7 +609,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
             {execModal.step === 'form' && (
               <div className="p-4 space-y-3">
                 <div className="text-[10px] text-muted-foreground">
-                  Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span>
+                  Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span> <ContactPhone name={row.assignee?.name} />
                 </div>
                 <div>
                   <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reassign To</label>
