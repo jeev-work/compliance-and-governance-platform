@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { cn, escalationCountdown } from '@/lib/utils';
 import { Users, AlertCircle, ArrowUpRight, GitFork, Clock, Flag } from 'lucide-react';
-import type { RagState } from '@/lib/mockData';
+import { RagState, RAG_SHORT } from '@/lib/mockData';
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green border-rag-green',
