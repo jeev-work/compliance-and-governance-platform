@@ -213,7 +213,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
         ledgerEntries: [
           ...row.ledgerEntries,
           newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification'),
-          newLedgerEntry('Verified & Closed', 'System · Telemetry', 'RAG returned to GREEN'),
+          newLedgerEntry('Ticket Closed', 'System · Telemetry', 'RAG returned to GREEN'),
         ],
       });
       toast.success(`${row.id} verified & closed — RAG back to GREEN`);
