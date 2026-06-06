@@ -126,7 +126,7 @@ export function SpocView() {
                   <td className="px-2 py-1">{row.system}</td>
                   <td className="px-2 py-1">{row.process}</td>
                   <td className="px-2 py-1 text-center">
-                    <span className={cn('px-1 py-0.5 rounded text-[9px] font-bold', RAG_BG[row.ragState])}>{row.ragState.slice(0, 3)}</span>
+                    <span className={cn('px-1 py-0.5 rounded text-[9px] font-bold', RAG_BG[row.ragState])}>{RAG_SHORT[row.ragState]}</span>
                   </td>
                   <td className={cn('px-2 py-1 text-right font-mono', row.breaches > 0 && 'rag-red font-semibold')}>{row.breaches}</td>
                   <td className={cn('px-2 py-1 text-right font-mono', row.failureRate > 2 ? 'rag-red' : row.failureRate > 0 ? 'rag-amber' : 'rag-green')}>{row.failureRate.toFixed(2)}%</td>
