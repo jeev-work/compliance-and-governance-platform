@@ -84,15 +84,18 @@ export function LobManagerView() {
                     const w: RagState = c.worst;
                     return (
                       <td key={p} className="p-1">
-                        <div className={cn(
-                          'rounded border px-1.5 py-1 text-center cursor-pointer hover:ring-1 hover:ring-primary/50 transition-all',
-                          RAG_BG[w],
-                          c.exec > 0 && 'exec-pulse',
-                        )}>
+                        <div
+                          onClick={() => openDrilldown('matrixCell', `${s}||${p}`)}
+                          title={`Open KPI status · ${s} × ${p}`}
+                          className={cn(
+                            'rounded border px-1.5 py-1 text-center cursor-pointer hover:ring-1 hover:ring-primary/50 transition-all',
+                            RAG_BG[w],
+                            c.exec > 0 && 'exec-pulse',
+                          )}>
                           <div className={cn('font-bold font-mono text-[9px]',
                             w === 'RED' ? 'rag-red' : w === 'AMBER' ? 'rag-amber' :
                             w === 'GREY' ? 'rag-grey' : w === 'BLUE' ? 'rag-blue' : 'rag-green')}>
-                            {w.slice(0, 3)}
+                            {RAG_SHORT[w]}
                           </div>
                           <div className="text-muted-foreground text-[9px]">{c.breaches > 0 ? `${c.breaches} br` : '—'}</div>
                         </div>
