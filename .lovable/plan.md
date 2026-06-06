@@ -1,46 +1,28 @@
-# Per-KPI Ledger from Chase Timeline
+## Issue
 
-Right now every KPI seed emits exactly one ledger entry — `KPI Generated` — even when the chase walked all the way through Acknowledged → Resolved → Verifying → Closed. The diagnostics modal therefore looks empty. Fix: derive the immutable ledger from the same chase timeline that already drives the modal, and correct the language ("ticket" lifecycle, not "KPI" lifecycle).
+Preview is blank because `generateMockData` throws:
 
-## Terminology fixes
-| Old | New |
-|---|---|
-| `KPI Generated` | `Ticket Generated` |
-| `Closed` (chase step label "Closed" → ledger) | `Ticket Closed` |
-
-(`Notified`, `Acknowledged`, `Resolution Deployed`, `Verifying Fix` keep their names — they describe what happened, not "KPI lifecycle".)
-
-## Generator change (`src/lib/mockData.ts`)
-Replace the single-entry seed with a derived list built from `chaseTimeline`:
-
-```text
-for each chase event:
-  Generated         → "Ticket Generated"   actor=System            details="RAG=<r> · sev=<s>"
-  Notified          → "Notified"           actor="Notifier Bot"    details="SPOC=<assignee>"
-  Acknowledged      → "Acknowledged"       actor=<event.actor>     details="Chase timer halted"
-  Resolved          → "Resolution Deployed" actor=<event.actor>    details="RCA submitted"
-  Verifying         → "Verifying Fix"      actor="System · Telemetry" details="Validation hold"
-  Closed            → "Ticket Closed"      actor="System · Telemetry" details="RAG returned to GREEN"
+```
+TypeError: Cannot read properties of null (reading 'name')
+  at src/lib/mockData.ts:409
 ```
 
-Each entry gets its own `fakeHash('LDG')` so the SHA-style proof is per-event, not shared.
+`assignee` is typed `{ name; role } | null` and stays `null` for CLEAN / unassigned rows, but the new `makeLedgerFromChase(...)` call passes `assignee.name` unconditionally.
 
-For CLEAN (non-breached) rows the chase timeline is empty → ledger stays empty (no "Generated" noise), matching "we only generate tickets when a breach happens".
+## Fix
 
-For Exec-flagged or dependency rows, the existing extra chase events (`Dependency fork`, `Executive reassign`) are already in `chaseTimeline.actor`; we'll surface them as `Multi-Team Dependency` / `Reassigned` entries when the actor string contains those markers.
+In `src/lib/mockData.ts` line 409, guard the access:
 
-## Diagnostics modal (`src/components/DrilldownPanel.tsx`)
-Already renders `row.ledgerEntries` — no template change needed. Live actions (`Acknowledge`, `Deploy Resolution`, `Enable Dependency`, etc.) already append entries with `newLedgerEntry(...)` and will continue to do so, so the ledger keeps growing in real-time during the demo. Only the labels of two future actions get aligned:
-- `Acknowledged` (already correct)
-- `Verified & Closed` → rename to `Ticket Closed` for consistency
+```ts
+ledgerEntries: makeLedgerFromChase(
+  rand,
+  chaseTimeline,
+  ragState,
+  severity,
+  assignee?.name ?? 'Unassigned',
+  !!dependency,
+  !!executiveFlag,
+),
+```
 
-## What we are NOT changing
-- The chase timeline UI itself (already shows steps in order).
-- Live-action append logic — still hash-stamped, still appears at the bottom of the ledger.
-- Master / LoB / system ledgers shown in Compliance view.
-
-## Files touched
-- `src/lib/mockData.ts` — replace the single-entry seed with `makeLedgerFromChase(...)`; rename "KPI Generated" → "Ticket Generated".
-- `src/components/DrilldownPanel.tsx` — rename `Verified & Closed` → `Ticket Closed` in the resolve flow.
-
-Approve to build.
+No other files need changes. `makeLedgerFromChase` already returns an empty array when `chaseTimeline` is empty, so unassigned CLEAN rows will continue to show an empty ledger.
