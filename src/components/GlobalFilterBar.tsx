@@ -183,7 +183,7 @@ export function GlobalFilterBar() {
                 active ? RAG_COLORS[s] : 'bg-secondary border-border text-muted-foreground hover:text-foreground',
               )}
             >
-              {s === 'UNCONFIGURED' ? 'UNC' : s.slice(0, 3)}
+              {RAG_SHORT[s]}
             </button>
           );
         })}
