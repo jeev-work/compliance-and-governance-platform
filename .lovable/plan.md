@@ -1,67 +1,47 @@
-Four independent changes. All scoped to existing files; no schema or backend work.
+## Root cause
 
-## 1. Reassign → dropdown of people with phone numbers
+`escalationCountdown` (`src/lib/utils.ts`) has early returns for `CLEAN`, `Resolved`, `Escalated to HOD`, and `paused dependency` rows. Anything else falls through to a live `budget - elapsedMin` calculation. The previous fix in `mockData.ts` clamped `ts` only for `Open` / `Investigating` / `Escalated to HOD` rows — but **`Verifying` rows were left with their original 0-90-day-old `ts`**. Those rows are still `BREACHED` and have no early return, so they render as `OVERDUE · -628h 1m`.
 
-**File:** `src/components/DrilldownPanel.tsx`
+KPI-35513 is one of those Verifying-state rows.
 
-- Replace `onReassign` (line 271, currently picks a random name silently) with `openReassignModal` that opens a new dialog.
-- Add `reassignModal` state next to existing `execModal`/`depModal`: `{ assignee, reason, step }`.
-- Build dialog (same overlay/card pattern as the Executive-Flag modal at ~line 597). Contents:
-  - Header: "Reassign Ticket"
-  - Current assignee line with existing `ContactPhone` chip
-  - `<select>` labelled "Reassign To" populated from `ASSIGNEES` (already exported from `mockData.ts`, 10 people with name + role + phone). Current assignee filtered out. Option label: `Name — Role`.
-  - To the right of the dropdown render the selected person's phone as a `tel:` link with the `Phone` icon (reuse `ContactPhone`), so the user can call them before confirming.
-  - Optional "Handover note" textarea.
-  - Footer: Cancel + Confirm Reassignment.
-- `commitReassign` mutates `assignee` to the full `ASSIGNEES` record (so role + phone propagate), pushes a `Notified` chase event, appends a `Reassigned` ledger entry including the note, toasts confirmation. Executive-Flag modal is left untouched.
+## Fix
 
-## 2. SPOC view — disable buttons after use
+**Single file: `src/lib/mockData.ts`**
 
-**File:** `src/components/DrilldownPanel.tsx` (action buttons live in the drilldown, used by SPOC)
+Extend the `isOpen` clamp to also cover `Verifying`:
 
-- `Acknowledge` button: disabled when `row.resolutionStatus !== 'Open'` OR `row.stateFlags.includes('Acknowledged')`. Already-acknowledged rows show the button greyed with label "Acknowledged".
-- `Deploy Resolution` button: disabled when `row.resolutionStatus` is `Verifying` or `Resolved`, or the row is `CLEAN`.
-- `Enable Multi-Team Dependency` button (opens `depModal` `enable`): disabled when `row.resolutionStatus` is `Verifying`/`Resolved` OR a dependency is already open. Label switches to "Dependency Active" when one exists.
-- Disabled state uses existing `ActionBtn` styling — add a `disabled` prop that applies `opacity-50 cursor-not-allowed pointer-events-none` and skips the `onClick`.
+```ts
+const isOpen =
+  resolutionStatus === 'Open'
+  || resolutionStatus === 'Investigating'
+  || resolutionStatus === 'Escalated to HOD'
+  || resolutionStatus === 'Verifying';
+```
 
-No business-logic change — same handlers, just gated.
+For Verifying rows we want the countdown chip to read like "12m left" / "OVERDUE · -8m" — same realistic range as the other open states — so we reuse the same `budget × 1.4` window.
 
-## 3. Per-role notification panel on the home page
+Also tighten `timeToResolveMin` for `Verifying` rows so the "Time to Resolve" tile doesn't claim 47 hours on a ticket that just deployed: cap it at `budget` minutes (`Math.floor(rand() * budget) + 5`). `Resolved` rows keep the existing 30–2910 min range — those reflect historical resolution time and the chip just shows "resolved in Xh Ym", which is fine.
 
-**File:** new `src/components/NotificationPanel.tsx`, mounted in `src/pages/Index.tsx` above the role view (after `KpiHistoryPanel`).
+## Defensive belt-and-braces in `src/lib/utils.ts`
 
-The panel reads `useFilters()` and renders a compact, collapsible card whose contents change per role:
+To make sure no future regression can produce a multi-hour `OVERDUE` chip, clamp the displayed remaining to a sane floor inside `escalationCountdown`:
 
-| Role | Notification feed contents (top 5, scroll for more) |
-| --- | --- |
-| executive   | New RED breaches in last 24h + any `executiveFlag` rows + escalations to HOD |
-| lobManager  | Unacknowledged breaches in scoped LoB + countdown-overdue rows + cross-functional forks needing visibility |
-| spoc        | Unacknowledged + Investigating rows assigned to current scope (chase-timer red zone first) |
-| compliance  | Newly-Resolved rows pending ledger sign-off + any GREY-state rows (data integrity) |
-| analyst     | Top 5 KPIs by 7-day breach trend delta (drives investigation) |
-| admin       | Connector outages (GREY clusters) + verification-pending rows + most recent ledger writes |
+```ts
+const displayRemaining = Math.max(remaining, -budget); // never worse than 1× budget overdue
+if (remaining < 0) {
+  return { label: `OVERDUE · ${fmtMinutes(displayRemaining)}`, tone: 'red', overdue: true };
+}
+```
 
-Each notification is a row with: icon (severity tone), KPI id (mono), system/process, short reason, timestamp ("12m ago"), assignee + phone via `getContactPhone`. Click → existing `openDrilldown('breach', row.id, row)`. Empty state: "All clear — no notifications for this role." Toggle button collapses the panel; state lives in local React state (no persistence needed).
+This is purely cosmetic — operational logic (auto-escalate trigger) still uses `remaining`, only the label is bounded.
 
-## 4. Fix unrealistic countdowns ("OVERDUE · -13h 35m" etc.)
+## Verification
 
-**File:** `src/lib/mockData.ts`, `generateMockData` (lines 169–260)
-
-Root cause: `baseDate` is hard-coded to `May 14, 2026` while today is `June 6, 2026`, and `hoursAgo` spans 90 days. Every open breach is therefore weeks past its 30–240-minute SLA budget, so `escalationCountdown` shows huge negative values.
-
-Changes (data generation only — no logic change in `utils.ts`):
-
-- `const baseDate = new Date();` (current time at generation).
-- Keep the 90-day window for **historical** rows (`Resolved`, `CLEAN`, `Verifying`), so trend charts still have depth.
-- For rows that will end up `Open`, `Investigating`, `Escalated to HOD`, or `Unacknowledged`, clamp `ts` to within the last `severity` budget × 2 (i.e. Critical within 60 min, High within 120 min, Medium within 4 h, Low within 8 h). Implementation: after the row is shaped, if `status === 'BREACHED'` and `resolutionStatus` is one of the open states, recompute `ts = new Date(now - rand() * budget*2 * 60000)` and propagate to `timestamp`, ledger seed, and chase-timeline offsets.
-- Grey-outage cluster anchor (`greyOutageStart`) repointed to `baseDate - 2d` so it stays inside the visible window.
-- Blue maintenance window: change the Saturday filter to "within the last completed Saturday window" so it doesn't bunch into a single ancient date.
-- Resolved rows keep their actual age (chips already show "resolved in 4h 12m" — that's fine and stays).
-
-Result: most open breaches show realistic countdowns ("23m left", "1h 04m left", at worst "OVERDUE · -45m") instead of "-13h 35m".
+- Reload preview; KPI-35513 (and any other `Verifying` row) should show a countdown in minutes/single-digit hours, not -628h.
+- `Resolved` rows still show their existing "resolved in 4h 12m" chip unchanged.
+- Trend charts spanning 90 days are unaffected (clamping only touches the small subset of currently-open rows).
 
 ## Out of scope
 
-- Persisting notification dismissals or panel collapsed-state across reloads.
-- Changing role-based access for the Reassign button (still gated by `ROLE_ACTIONS`).
-- Editing the separate Executive-Flag reassignment dialog.
+- Changing the auto-escalate logic itself.
+- Reshuffling historical resolved-row timestamps (those drive trend depth and should stay).
