@@ -166,10 +166,13 @@ function pickRagState(rand: () => number): RagState {
   return 'UNCONFIGURED';
 }
 
+/** SLA escalation budget by severity (minutes). Mirrors utils.ESCALATE_BUDGET_MIN. */
+const SEV_BUDGET_MIN: Record<string, number> = { Critical: 30, High: 60, Medium: 120, Low: 240 };
+
 export function generateMockData(count = 30000): KPIRow[] {
   const rand = seeded(42);
   const rows: KPIRow[] = [];
-  const baseDate = new Date(2026, 4, 14); // May 14, 2026
+  const baseDate = new Date(); // anchor to "now" so countdowns are realistic
 
   // Pre-seed a Grey connector outage cluster (Blueprint §2 Exception 1)
   const greyOutageStart = new Date(baseDate.getTime() - 2 * 86400000);
@@ -180,7 +183,7 @@ export function generateMockData(count = 30000): KPIRow[] {
 
   for (let i = 0; i < count; i++) {
     const hoursAgo = Math.floor(rand() * 90 * 24);
-    const ts = new Date(baseDate.getTime() - hoursAgo * 3600000);
+    let ts = new Date(baseDate.getTime() - hoursAgo * 3600000);
     const date = ts.toISOString().split('T')[0];
     const system = pick(rand, SYSTEMS);
     const process = pick(rand, PROCESSES);
