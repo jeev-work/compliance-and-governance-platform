@@ -21,6 +21,7 @@ function DashboardContent() {
         <GlobalFilterBar />
         <main className="flex-1 p-3 overflow-y-auto scrollbar-thin">
           <KpiHistoryPanel />
+          <NotificationPanel />
           {filters.role === 'executive'  && <ExecutiveView />}
           {filters.role === 'lobManager' && <LobManagerView />}
           {filters.role === 'spoc'       && <SpocView />}
