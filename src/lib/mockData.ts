@@ -308,6 +308,8 @@ export function generateMockData(count = 30000): KPIRow[] {
       failureRate,
       targetSLA: 0.05,
       slaVersion,
+      slaHistory,
+      configSnapshotId: slaVersion,
       ragState,
       status,
       resolutionStatus,
