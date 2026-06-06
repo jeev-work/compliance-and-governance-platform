@@ -32,6 +32,16 @@ const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Se
 /** Five-state governance status per Blueprint §1 Layer 3 */
 export type RagState = 'GREEN' | 'AMBER' | 'RED' | 'GREY' | 'BLUE' | 'UNCONFIGURED';
 
+/** Short 3-letter labels — GRE collision between GREEN/GREY fixed: GRN vs GRY. */
+export const RAG_SHORT: Record<RagState, string> = {
+  GREEN: 'GRN',
+  AMBER: 'AMB',
+  RED:   'RED',
+  GREY:  'GRY',
+  BLUE:  'BLU',
+  UNCONFIGURED: 'UNC',
+};
+
 /** Operational state flags exposed in the universal filter ribbon */
 export type StateFlag =
   | 'Acknowledged' | 'Unacknowledged' | 'Escalated'
@@ -47,6 +57,16 @@ export type CommentEntry = { author: string; role: string; timestamp: string; te
 export type ChaseEvent = { step: ChaseStep; timestamp: string; actor: string };
 export type DependencyFork = { team: string; timestamp: string; linkedId: string; status: 'open' | 'resolved' };
 export type LedgerEntry = { timestamp: string; actor: string; action: string; hash: string; details?: string };
+
+/** Per-KPI SLA version history — each KPI carries its own threshold trail. */
+export type SlaVersionRecord = {
+  version: string;
+  activeFrom: string;
+  changedBy: string;
+  threshold: number;     // e.g. 0.05 = 5% failure-rate ceiling
+  changeNote: string;
+};
+
 
 export type KPIRow = {
   id: string;
