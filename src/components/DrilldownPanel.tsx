@@ -1,14 +1,31 @@
 import { useFilters } from '@/lib/filterContext';
-import { ChaseStep, KPIRow, RagState, LedgerEntry } from '@/lib/mockData';
+import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone } from '@/lib/mockData';
 import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer,
+  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer, Phone,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
+
+/** Inline contact phone badge — shown next to any displayed person name. */
+function ContactPhone({ name }: { name: string | null | undefined }) {
+  const phone = getContactPhone(name);
+  if (!phone) return null;
+  return (
+    <a
+      href={`tel:${phone.replace(/[^+\d]/g, '')}`}
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex items-center gap-0.5 font-mono text-muted-foreground hover:text-primary"
+      title={`Call ${name}`}
+    >
+      <Phone className="h-2.5 w-2.5" />{phone}
+    </a>
+  );
+}
+
 
 const DEPENDENCY_TEAMS = ['Network Ops', 'Infrastructure', 'Database Admin', 'Security Eng', 'Cloud Platform'];
 const ASSIGNEE_POOL = [
