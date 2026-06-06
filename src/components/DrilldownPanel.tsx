@@ -271,15 +271,19 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     setExecModal(null);
     toast.error(`EXECUTIVE FLAG raised — reassigned to ${next.name}`);
   };
-  const onReassign = () => {
-    const pool = ['J. Chen', 'M. Patel', 'S. Kumar', 'A. Williams', 'R. Thompson', 'K. Garcia'].filter(n => n !== row.assignee?.name);
-    const next = pool[Math.floor(Math.random() * pool.length)];
+  const openReassignModal = () => setReassignModal({
+    assignee: ASSIGNEES.find(a => a.name !== row.assignee?.name)?.name ?? ASSIGNEES[0].name,
+    reason: '',
+  });
+  const commitReassign = (assigneeName: string, note: string) => {
+    const next = ASSIGNEES.find(a => a.name === assigneeName) ?? ASSIGNEES[0];
     mutateRow(row.id, {
-      assignee: { name: next, role: 'Sr. Engineer' },
-      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: new Date().toISOString(), actor: `Reassigned → ${next}` }],
-      ledgerEntries: appendLedger(newLedgerEntry('Reassigned', 'LOB Manager · You', `→ ${next}`)),
+      assignee: { name: next.name, role: next.role },
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: new Date().toISOString(), actor: `Reassigned → ${next.name}` }],
+      ledgerEntries: appendLedger(newLedgerEntry('Reassigned', 'LOB Manager · You', `→ ${next.name} (${next.role})${note ? ` · ${note}` : ''}`)),
     });
-    toast.success(`${row.id} reassigned to ${next}`);
+    setReassignModal(null);
+    toast.success(`${row.id} reassigned to ${next.name} · ${next.phone}`);
   };
   const onEscalate = () => {
     mutateRow(row.id, {
