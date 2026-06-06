@@ -66,7 +66,8 @@ export function escalationCountdown(row: {
     return { label: `⏸ paused · ${fmtMinutes(Math.max(remaining, 0))} left`, tone: 'muted', overdue: false };
   }
   if (remaining < 0) {
-    return { label: `OVERDUE · ${fmtMinutes(remaining)}`, tone: 'red', overdue: true };
+    const display = Math.max(remaining, -budget); // cap label at 1× budget overdue
+    return { label: `OVERDUE · ${fmtMinutes(display)}`, tone: 'red', overdue: true };
   }
   if (remaining < budget * 0.25) {
     return { label: `${fmtMinutes(remaining)} left`, tone: 'red', overdue: false };
