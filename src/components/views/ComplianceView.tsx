@@ -3,9 +3,10 @@ import { useFilters } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
 import { FileWarning, CheckCircle2, Search, AlertOctagon, Clock, ArrowUpRight, FileDown, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { exportMasterLedger, exportMicroLedger } from '@/lib/exportLedger';
 
 export function ComplianceView() {
-  const { filteredData, openDrilldown } = useFilters();
+  const { filteredData, openDrilldown, masterLedger, configSnapshots } = useFilters();
   const [query, setQuery] = useState('');
 
   const breachRows = useMemo(() => filteredData.filter(r => r.status === 'BREACHED'), [filteredData]);
