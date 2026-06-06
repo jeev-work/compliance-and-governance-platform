@@ -132,7 +132,7 @@ export function LobManagerView() {
                   </div>
                   <div className="text-muted-foreground mt-0.5">{r.system} · {r.process}</div>
                   <div className="flex items-center justify-between mt-0.5">
-                    <span className="text-muted-foreground">{r.lob} · {r.assignee?.name || 'unassigned'}</span>
+                    <span className="text-muted-foreground">{r.lob} · {r.assignee?.name || 'unassigned'}{r.assignee && getContactPhone(r.assignee.name) && <span className="ml-1 font-mono">· {getContactPhone(r.assignee.name)}</span>}</span>
                     <span className={cn('flex items-center gap-1 font-semibold', toneClass)}>
                       <Clock className="h-2.5 w-2.5" /> {c.label}
                     </span>
