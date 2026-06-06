@@ -9,6 +9,7 @@ import { AnalystView } from '@/components/views/AnalystView';
 import { AdminHealthView } from '@/components/views/AdminHealthView';
 import { DrilldownPanel } from '@/components/DrilldownPanel';
 import { KpiHistoryPanel } from '@/components/KpiHistoryPanel';
+import { NotificationPanel } from '@/components/NotificationPanel';
 
 function DashboardContent() {
   const { filters } = useFilters();
