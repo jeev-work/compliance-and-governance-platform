@@ -46,6 +46,12 @@ export function DrilldownPanel() {
   if (drilldown.type === 'breach' && drilldown.row) {
     return <BreachDetail row={drilldown.row} onClose={closeDrilldown} />;
   }
+  if (drilldown.type === 'matrixCell' && drilldown.value) {
+    const [sys, proc] = drilldown.value.split('||');
+    const rows = filteredData.filter(r => r.system === sys && r.process === proc);
+    return <MatrixCellDrilldown system={sys} process={proc} rows={rows} onClose={closeDrilldown}
+      onSelect={(row) => openDrilldown('breach', row.id, row)} />;
+  }
   if (drilldown.type === 'system' || drilldown.type === 'process' || drilldown.type === 'lob') {
     const k = drilldown.type;
     const v = drilldown.value!;
@@ -54,6 +60,68 @@ export function DrilldownPanel() {
       onSelectBreach={(row) => openDrilldown('breach', row.id, row)} />;
   }
   return null;
+}
+
+function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
+  system: string; process: string; rows: KPIRow[]; onClose: () => void; onSelect: (r: KPIRow) => void;
+}) {
+  const counts = rows.reduce((m, r) => { m[r.ragState] = (m[r.ragState] ?? 0) + 1; return m; }, {} as Record<RagState, number>);
+  const sorted = [...rows].sort((a, b) => {
+    const order: RagState[] = ['RED', 'AMBER', 'GREY', 'BLUE', 'UNCONFIGURED', 'GREEN'];
+    return order.indexOf(a.ragState) - order.indexOf(b.ragState);
+  });
+  return (
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-8 overflow-y-auto">
+      <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            <div>
+              <h2 className="text-sm font-semibold">{system} × {process}</h2>
+              <p className="text-[10px] text-muted-foreground">{rows.length.toLocaleString()} KPIs · current status of every KPI in this cell</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-border text-[10px] flex-wrap">
+          {(['RED','AMBER','GREY','BLUE','GREEN','UNCONFIGURED'] as RagState[]).map(s => counts[s] ? (
+            <span key={s} className={cn('px-1.5 py-0.5 rounded font-mono font-bold border', RAG_BG[s])}>
+              {s}: {counts[s]}
+            </span>
+          ) : null)}
+        </div>
+        <div className="px-4 py-3 max-h-[480px] overflow-y-auto scrollbar-thin space-y-1">
+          {sorted.map(r => {
+            const c = escalationCountdown(r);
+            const toneClass = c.tone === 'red' ? 'rag-red' : c.tone === 'amber' ? 'rag-amber' : c.tone === 'green' ? 'rag-green' : 'text-muted-foreground';
+            return (
+              <div key={r.id} onClick={() => onSelect(r)}
+                className={cn(
+                  'flex items-center gap-2 px-2 py-1.5 rounded border text-[10px] cursor-pointer hover:ring-1 hover:ring-primary/50',
+                  RAG_BG[r.ragState],
+                  r.executiveFlag && 'exec-pulse',
+                )}>
+                <span className="font-mono font-semibold text-foreground">{r.id}</span>
+                <span className="text-muted-foreground">{r.lob}</span>
+                <span className={cn('font-bold font-mono px-1 rounded', RAG_BG[r.ragState])}>{r.ragState}</span>
+                {r.status === 'BREACHED' && <span className="font-mono rag-red">{r.breaches} br</span>}
+                {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
+                {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
+                <span className="ml-auto text-muted-foreground">{r.resolutionStatus}</span>
+                {r.assignee && <span className="text-muted-foreground">→ {r.assignee.name}</span>}
+                {r.status === 'BREACHED' && (
+                  <span className={cn('flex items-center gap-1 font-semibold ml-1', toneClass)}>
+                    <Timer className="h-2.5 w-2.5" /> {c.label}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {sorted.length === 0 && <div className="text-[10px] text-muted-foreground italic text-center py-4">No KPIs in this intersection for the current filter scope.</div>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
