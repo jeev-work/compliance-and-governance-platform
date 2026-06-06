@@ -403,7 +403,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
             <User className="h-3.5 w-3.5 text-primary" />
             <div>
               <div className="text-[9px] text-muted-foreground uppercase">Assignee</div>
-              <div className="text-xs font-semibold">{row.assignee?.name || '—'}</div>
+              <div className="text-xs font-semibold flex items-center gap-1.5">{row.assignee?.name || '—'} <ContactPhone name={row.assignee?.name} /></div>
               {row.assignee && <div className="text-[9px] text-muted-foreground">{row.assignee.role}</div>}
             </div>
           </div>
