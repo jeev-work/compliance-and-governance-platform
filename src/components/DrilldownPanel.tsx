@@ -199,13 +199,24 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
   const actions = ROLE_ACTIONS[filters.role];
 
   // Dependency toggle modal state
-  const [depModal, setDepModal] = useState<null | { mode: 'enable' | 'disable'; team: string; reason: string; step: 'form' | 'confirm' }>(null);
+  const [depModal, setDepModal] = useState<null | {
+    mode: 'enable' | 'disable'; team: string; system: string; lob: string;
+    comment: string; attachments: string[]; step: 'form' | 'confirm';
+  }>(null);
 
   // Executive Flag + Reassign modal state
   const [execModal, setExecModal] = useState<null | { assignee: string; reason: string; step: 'form' | 'confirm' }>(null);
 
-  // Standard Reassign modal state (non-executive)
-  const [reassignModal, setReassignModal] = useState<null | { assignee: string; reason: string }>(null);
+  // Standard Reassign modal state (non-executive) — now with search + filters
+  const [reassignModal, setReassignModal] = useState<null | {
+    assignee: string; reason: string;
+    query: string; lobFilter: string; deptFilter: string; designationFilter: string;
+  }>(null);
+
+  // Resolve confirmation modal — captures a comment + media before closing.
+  const [resolveModal, setResolveModal] = useState<null | {
+    mode: 'standard' | 'cascade'; comment: string; attachments: string[];
+  }>(null);
 
   // Tick every 30s so the countdown re-renders without a full data refresh
   const [, setNow] = useState(0);
