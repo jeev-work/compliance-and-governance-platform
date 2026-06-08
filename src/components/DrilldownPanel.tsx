@@ -96,8 +96,8 @@ function BackButton({ onBack }: { onBack?: () => void }) {
   );
 }
 
-function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
-  system: string; process: string; rows: KPIRow[]; onClose: () => void; onSelect: (r: KPIRow) => void;
+function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect }: {
+  system: string; process: string; rows: KPIRow[]; onClose: () => void; onBack?: () => void; onSelect: (r: KPIRow) => void;
 }) {
   const counts = rows.reduce((m, r) => { m[r.ragState] = (m[r.ragState] ?? 0) + 1; return m; }, {} as Record<RagState, number>);
   const sorted = [...rows].sort((a, b) => {
@@ -109,6 +109,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
+            <BackButton onBack={onBack} />
             <Shield className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-sm font-semibold">{system} × {process}</h2>
@@ -158,7 +159,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
   );
 }
 
-function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
+function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => void; onBack?: () => void }) {
   const { filters, mutateRow, configSnapshots } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
@@ -820,8 +821,8 @@ function TS({ icon: Icon, color, label, value }: { icon: any; color: string; lab
   );
 }
 
-function GroupDrilldown({ type, value, rows, onClose, onSelectBreach }: {
-  type: 'system' | 'process' | 'lob'; value: string; rows: any[]; onClose: () => void; onSelectBreach: (row: KPIRow) => void;
+function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: {
+  type: 'system' | 'process' | 'lob'; value: string; rows: any[]; onClose: () => void; onBack?: () => void; onSelectBreach: (row: KPIRow) => void;
 }) {
   const breached = rows.filter(r => r.status === 'BREACHED');
   const totalBreaches = rows.reduce((s, r) => s + r.breaches, 0);
@@ -840,6 +841,7 @@ function GroupDrilldown({ type, value, rows, onClose, onSelectBreach }: {
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
+            <BackButton onBack={onBack} />
             <Shield className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-sm font-semibold">{value}</h2>
