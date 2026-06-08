@@ -205,7 +205,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       stateFlags: ['Unconfigured'],
       assignee: { name: input.spoc, role: 'KPI SPOC' },
       escalations: [], comments: [], chaseTimeline: [], dependency: null,
-      executiveFlag: false, auditLedgerId: fakeHash('LDG'),
+      executiveFlag: false, executiveFlagSetAt: null, auditLedgerId: fakeHash('LDG'),
       maintenanceWindow: null,
       timeToDetectMin: null, timeToEscalateMin: null, timeToResolveMin: null,
       resolvedBy: null, severity: input.severity, riskScore: 0,
