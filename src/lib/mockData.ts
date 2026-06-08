@@ -414,10 +414,22 @@ export function generateMockData(count = 30000): KPIRow[] {
         changeNote: notes[v] ?? `Refinement v1.${v}`,
       });
     }
+    // For non-Resolved/non-Clean breaches, anchor the chase timeline to "fresh"
+    // (last event within the last 7h) so the drilldown's "Since Last Update"
+    // never reads as days/weeks. Resolved rows keep their historical anchor.
+    const isActiveBreach = status === 'BREACHED'
+      && resolutionStatus !== 'Resolved';
+    const chaseAnchor = isActiveBreach
+      ? new Date(baseDate.getTime() - Math.floor(rand() * (7 * 60 - 5) + 5) * 60000)
+      : ts;
     const chaseTimeline = status === 'BREACHED'
-      ? makeChaseTimeline(rand, ts, resolutionStatus, !!dependency)
+      ? makeChaseTimeline(rand, chaseAnchor, resolutionStatus, !!dependency)
       : [];
 
+    // Executive Flag set-at: spread across the last 24h so auto-expiry is visible in demo
+    const executiveFlagSetAt = executiveFlag
+      ? new Date(baseDate.getTime() - Math.floor(rand() * 24 * 60) * 60000).toISOString()
+      : null;
 
     rows.push({
       id: `KPI-${10000 + i}`,
@@ -444,6 +456,7 @@ export function generateMockData(count = 30000): KPIRow[] {
       chaseTimeline,
       dependency,
       executiveFlag,
+      executiveFlagSetAt,
       auditLedgerId: fakeHash(rand),
       maintenanceWindow: ragState === 'BLUE' ? maintenanceWindowLabel : null,
       timeToDetectMin,
