@@ -335,6 +335,67 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
     toast.success(`Executive Flag cleared on ${row.id}`);
   };
 
+  // Cascade auto-suggest: child sub-ticket resolved → offer to verify & close parent.
+  const showCascadeBanner = !!row.dependency
+    && row.dependency.status === 'resolved'
+    && !row.dependency.cascadeDismissed
+    && row.resolutionStatus !== 'Resolved'
+    && row.status !== 'CLEAN';
+
+  const onCascadeClose = () => {
+    if (!row.dependency) return;
+    const dep = row.dependency;
+    const ts = new Date().toISOString();
+    mutateRow(row.id, {
+      resolutionStatus: 'Verifying',
+      stateFlags: row.stateFlags.filter(f => f !== 'Unacknowledged').concat('Verifying'),
+      chaseTimeline: [...row.chaseTimeline,
+        { step: 'Resolved', timestamp: ts, actor: 'You · cascade' },
+        { step: 'Verifying', timestamp: ts, actor: 'System' },
+      ],
+      ledgerEntries: [
+        ...row.ledgerEntries,
+        newLedgerEntry('Parent closure suggested by cascade rule', 'SPOC · You',
+          `Triggered by child resolution: ${dep.linkedId} (${dep.team})`),
+        newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Cascade close — awaiting telemetry verification'),
+      ],
+    });
+    toast.success(`Cascade close accepted — verifying telemetry (3s)…`);
+    if (verifyTimer.current) clearTimeout(verifyTimer.current);
+    verifyTimer.current = setTimeout(() => {
+      const closedAt = new Date().toISOString();
+      mutateRow(row.id, {
+        resolutionStatus: 'Resolved',
+        status: 'CLEAN',
+        ragState: 'GREEN',
+        severity: 'Low',
+        riskScore: 0,
+        breaches: 0,
+        failureRate: 0,
+        stateFlags: row.stateFlags.filter(f => f !== 'Unacknowledged' && f !== 'Verifying' && f !== 'Escalated'),
+        ledgerEntries: [
+          ...row.ledgerEntries,
+          newLedgerEntry('Parent closure suggested by cascade rule', 'SPOC · You',
+            `Triggered by child resolution: ${dep.linkedId} (${dep.team})`),
+          newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Cascade close — awaiting telemetry verification'),
+          newLedgerEntry('Ticket Closed', 'System · Telemetry', 'Cascade closure verified — RAG returned to GREEN'),
+        ],
+      });
+      toast.success(`${row.id} closed via cascade — RAG back to GREEN`);
+    }, 3000);
+  };
+
+  const onCascadeDismiss = () => {
+    if (!row.dependency) return;
+    mutateRow(row.id, {
+      dependency: { ...row.dependency, cascadeDismissed: true },
+      ledgerEntries: appendLedger(newLedgerEntry('Cascade suggestion dismissed', 'SPOC · You',
+        `Parent kept open despite child ${row.dependency.linkedId} resolution`)),
+    });
+    toast.message(`Cascade suggestion dismissed for ${row.id}`);
+  };
+
+
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-8 overflow-y-auto">
