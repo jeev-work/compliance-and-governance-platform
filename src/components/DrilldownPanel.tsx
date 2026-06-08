@@ -60,6 +60,8 @@ function relTime(iso: string): string {
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d ago`;
   return new Date(iso).toLocaleString();
+}
+
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green rag-green',
