@@ -111,8 +111,8 @@ function FooterExport({ onClick, label = 'Export' }: { onClick: () => void; labe
   );
 }
 
-function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect }: {
-  system: string; process: string; rows: KPIRow[]; onClose: () => void; onBack?: () => void; onSelect: (r: KPIRow) => void;
+function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel, onSelect }: {
+  system: string; process: string; rows: KPIRow[]; onClose: () => void; onBack: () => void; backLabel?: string; onSelect: (r: KPIRow) => void;
 }) {
   const counts = rows.reduce((m, r) => { m[r.ragState] = (m[r.ragState] ?? 0) + 1; return m; }, {} as Record<RagState, number>);
   const sorted = [...rows].sort((a, b) => {
@@ -177,7 +177,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect 
   );
 }
 
-function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => void; onBack?: () => void }) {
+function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClose: () => void; onBack: () => void; backLabel?: string }) {
   const { filters, mutateRow, configSnapshots } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
@@ -956,8 +956,8 @@ function TS({ icon: Icon, color, label, value, caption }: { icon: any; color: st
   );
 }
 
-function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: {
-  type: 'system' | 'process' | 'lob'; value: string; rows: any[]; onClose: () => void; onBack?: () => void; onSelectBreach: (row: KPIRow) => void;
+function GroupDrilldown({ type, value, rows, onClose, onBack, backLabel, onSelectBreach }: {
+  type: 'system' | 'process' | 'lob'; value: string; rows: any[]; onClose: () => void; onBack: () => void; backLabel?: string; onSelectBreach: (row: KPIRow) => void;
 }) {
   const breached = rows.filter(r => r.status === 'BREACHED');
   const totalBreaches = rows.reduce((s, r) => s + r.breaches, 0);
@@ -1022,7 +1022,7 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: 
                 <span className="text-muted-foreground">{row.date}</span>
                 <span className={cn('font-semibold', row.severity === 'Critical' ? 'rag-red' : 'rag-amber')}>{row.severity}</span>
                 <span className="font-mono rag-red">{row.breaches} breaches</span>
-                {row.executiveFlag && <ShieldAlert className="h-3 w-3 rag-red" />}
+                {row.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {row.dependency?.status === 'resolved' && !row.dependency.cascadeDismissed && row.resolutionStatus !== 'Resolved' && (
                   <span className="text-[9px] px-1 py-0.5 rounded font-semibold bg-rag-green rag-green border border-rag-green">↩ child resolved</span>
                 )}
