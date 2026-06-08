@@ -6,7 +6,7 @@ import {
   Building2, Layers, GitBranch, X,
 } from 'lucide-react';
 import { FILTER_OPTIONS, RAG_SHORT, Severity } from '@/lib/mockData';
-import { exportMasterLedger, exportMicroLedger } from '@/lib/exportLedger';
+import { exportMicroLedger } from '@/lib/exportLedger';
 import { toast } from 'sonner';
 
 type AuthoringMode = null | 'kpi' | 'lob' | 'system';
