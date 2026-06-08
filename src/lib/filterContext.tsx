@@ -314,7 +314,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   return (
     <FilterContext.Provider value={{
       filters, setFilters, filteredData, allData, historyView,
-      drilldown, openDrilldown, closeDrilldown, mutateRow,
+      drilldown, drilldownStack, openDrilldown, popDrilldown, closeDrilldown, mutateRow,
       registries, addLob, addSystem, addKpi,
       masterLedger, lobLedgers, systemLedgers, configSnapshots,
     }}>
