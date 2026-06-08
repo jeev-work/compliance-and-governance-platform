@@ -142,6 +142,9 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect 
                 {r.status === 'BREACHED' && <span className="font-mono rag-red">{r.breaches} breaches</span>}
                 {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
+                {r.dependency?.status === 'resolved' && !r.dependency.cascadeDismissed && r.resolutionStatus !== 'Resolved' && (
+                  <span className="text-[9px] px-1 py-0.5 rounded font-semibold bg-rag-green rag-green border border-rag-green">↩ child resolved</span>
+                )}
                 <span className="ml-auto text-muted-foreground">{r.resolutionStatus}</span>
                 {r.assignee && <span className="text-muted-foreground">→ {r.assignee.name} <ContactPhone name={r.assignee.name} /></span>}
                 {r.status === 'BREACHED' && (
@@ -1005,6 +1008,9 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: 
                 <span className={cn('font-semibold', row.severity === 'Critical' ? 'rag-red' : 'rag-amber')}>{row.severity}</span>
                 <span className="font-mono rag-red">{row.breaches} breaches</span>
                 {row.executiveFlag && <ShieldAlert className="h-3 w-3 rag-red" />}
+                {row.dependency?.status === 'resolved' && !row.dependency.cascadeDismissed && row.resolutionStatus !== 'Resolved' && (
+                  <span className="text-[9px] px-1 py-0.5 rounded font-semibold bg-rag-green rag-green border border-rag-green">↩ child resolved</span>
+                )}
                 <span className="ml-auto text-muted-foreground">{row.resolutionStatus}</span>
                 {row.assignee && <span className="text-muted-foreground">→ {row.assignee.name} <ContactPhone name={row.assignee.name} /></span>}
               </div>
