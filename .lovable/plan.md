@@ -1,88 +1,97 @@
-# Demo data reset + export overhaul
+# Export placement + realistic numbers + mixed RAG
 
-## 1. Reset mock data to realistic, "live now" state
-File: `src/lib/mockData.ts`
+## 1. Where Option A lives in the UI
 
-**RAG mix rebalance** (`pickRagState`, currently 78% GRN / 9% AMB / 6% RED):
-- GREEN ~88%, AMBER ~7%, RED ~3%, GREY ~1%, BLUE ~0.8%, UNCONFIGURED ~0.2%
-- Cap RED breaches per row: `5–80` (was `50–1550`) so totals look like a few hundred, not 179,625
+The top filter bar (`GlobalFilterBar.tsx`) already has a right-aligned status cluster (`{greyCount} GREY`, `{breachCount} breaches`, `{records}`). I'll add the **Export** control to the far right of that same row, *after* the records counter, separated by a `w-px h-5 bg-border` divider — same vertical rhythm as the rest of the bar, no new row added.
 
-**Per-system bias** so the System Health card is visually mixed (not all RED):
 ```text
-Core Banking    → mostly GREEN (BLUE during maint window)
-Payment Gateway → GREEN, occasional AMBER (GREY cluster stays)
-CRM             → GREEN
-Document Cloud  → AMBER-leaning (one of the warning systems)
-Data Warehouse  → AMBER/RED-leaning (the hot system)
-Auth Engine     → GREEN
+[ search | role | date | LoB systems process | state | RAG | sev ]      … GREY  breaches  records │ ⬇ Export ▾
 ```
-Implement via a `SYSTEM_BIAS` table that perturbs `pickRagState` per row.
 
-**Lifecycle freshness — close old, open new:**
-- Any breach older than 24 h → force `resolutionStatus = 'Resolved'`, populate `timeToResolveMin`, append `Closed` chase step + ledger entry. No stale "Investigating" rows from 3 weeks ago.
-- Open breaches (Open / Investigating / Verifying / Escalated) only generated for rows within the last 8 h, clamped to severity budget so countdowns read "12m left", "OVERDUE -4m" etc.
-- New "fresh tickets" cohort: ~15 RED + ~25 AMBER created within the last 2 h, spread across the AMBER/RED-biased systems above.
+- Trigger: small `h-7` button, `FileDown` icon + "Export" label, matches existing chip styling.
+- Opens a `Popover` (not full dropdown menu) with 4 items:
+  1. **Current view (CSV)** — what the active role view shows
+  2. **Filtered KPIs + ledgers (CSV)** — respects every active filter
+  3. **Master ledger bundle (JSON)** — snapshot-stamped, existing `exportMasterLedger`
+  4. **Selected KPI micro-ledger (CSV)** — enabled only when Drilldown is open; reads `filters.drilldown`
+- Each item shows a tiny secondary line ("17 rows · current filter") so users know what they'll get.
+- Per-row **Export** in the Compliance ledger table stays (auditor convenience).
+- Removed: card-level Export buttons in Admin Health (×3), Compliance master-ledger header button, Drilldown "Export Regulatory Audit" button (subsumed into menu item 4 — drilldown stays open so users still hit it from one click).
 
-**Ledger correctness** — `makeLedgerFromChase` already derives entries from `chaseTimeline`, so forcing closure above automatically gives every closed KPI a full Generated → Notified → Acknowledged → Resolved → Verifying → Closed micro-ledger.
+If the filter bar wraps on narrow viewports, the Export pill wraps with the right-side cluster, which is fine — it already wraps today.
 
-## 2. Micro-ledger exports → CSV everywhere
-File: `src/lib/exportLedger.ts`
-- Add `exportMicroLedgerCsv(scope, entries, snapshots, context?)` that emits one row per ledger entry with columns:
-  `timestamp, actor, action, details, hash, kpi_id, lob, system, process, sla_version_at_event, config_snapshot_id, threshold_at_event, current_sla_version, current_rag`
-- CSV-escape (quote, double-quote internal quotes, CRLF line endings).
-- Keep `exportMasterLedger` as JSON (it's a bundle of snapshots + master ledger — CSV would lose structure). Master export label still changes (see §3).
-- Replace every `exportMicroLedger(...)` call site with `exportMicroLedgerCsv(...)`:
-  - `src/components/views/ComplianceView.tsx` (row-level Export button)
-  - `src/components/views/AdminHealthView.tsx` (LoB ledger, System ledger, KPI-level Micro Ledger)
-  - `src/components/DrilldownPanel.tsx` (the `onExport` regulatory audit handler — wire it to CSV of the current row's `ledgerEntries`)
+## 2. Realistic numbers fix
 
-## 3. Simplify all export labels to "Export"
-- `ComplianceView.tsx` L55: `Export Master Ledger` → `Export`
-- `AdminHealthView.tsx` L213: `Export Micro Ledger` → `Export`
-- `AdminHealthView.tsx` L69 (master ledger button label) → `Export`
-- `DrilldownPanel.tsx` L539: `Export Regulatory Audit` → `Export`; toast message L296 → `Audit exported · hash: …` (keep hash for trust signal)
+`generateMockData` currently produces 30,000 KPI rows with `baseVolume = rand × 500,000 + 1,000`. Even with capped breaches (5–80 RED, 1–20 AMBER), totals across 30k rows give:
 
-## 4. "br" → "breaches" (display strings only)
-- `src/components/views/SpocView.tsx` L85
-- `src/components/DrilldownPanel.tsx` L124
-- `src/components/views/LobManagerView.tsx` L100
-(Internal variable names `br` in ExecutiveView/AnalystView aggregations stay — they're not user-visible.)
+- ~900 RED rows × ~40 avg = ~36k breaches
+- ~2,100 AMBER × ~10 avg = ~21k breaches
+- → still ~50–60k aggregate, and per-LoB ~17–20k each
 
-## 5. System Health card — sort by breaches desc
-`src/components/views/ExecutiveView.tsx` L79 — append `.sort((a, b) => b.breaches - a.breaches)` to `systemGrid`.
+Two changes:
 
-## 6. Export-button UX consolidation (proposal — pick one)
+**(a) Shrink the row count to demo-scale.** Drop from 30,000 → ~1,800 rows (90 days × ~20 KPI definitions × 1 row/day-bucket). Total breaches land at roughly 2–4k aggregate, ~600–1,300 per LoB, ~200–600 per system — readable in scorecards.
 
-Right now the platform has ~6 export buttons scattered across Compliance, Admin Health (×3 cards + per-KPI), and the Drilldown panel. For a demo this reads as clutter. Three options:
+**(b) Shrink baseVolume to per-process realistic ranges.** Replace `rand × 500000 + 1000` with a per-process band:
 
-**Option A — Single global "Export" menu in the top bar (recommended)**
-One button in `GlobalFilterBar`. Opens a dropdown:
-- Current view (CSV)
-- Filtered KPIs + ledgers (CSV)
-- Master ledger bundle (JSON, snapshot-stamped)
-- Selected KPI micro-ledger (only enabled when drilldown is open)
+```text
+KYC Verification → 5k–25k          API Uptime      → 50k–200k
+Ledger Sync      → 2k–8k           AML Screening   → 8k–40k
+Ticket Routing   → 1k–5k           DB Backup       → 100–800
+```
 
-Pros: one mental model, respects the active filter (so "what you see is what you export"), removes 5 buttons.
-Cons: per-row Export in the Compliance ledger table is genuinely useful for auditors — keep that one inline, remove the rest.
+Failure-rate math stays meaningful (a 30-breach RED on 6,000 KYC volume = 0.5%, not 0.006%).
 
-**Option B — Contextual export only in Drilldown + Compliance row**
-Remove the three card-level export buttons in Admin Health and the master-ledger button in Compliance. Move "Export Master" into the Admin Health header as a single overflow `…` menu. Keep per-row export in Compliance.
+**(c) Tighten the SLA aggregate.** With smaller volumes the existing `(vol-br)/vol` math will naturally read 99.4–99.95% in green periods and dip into 97s during the fresh-breach window, instead of the artificial 99.99% it shows now.
 
-Pros: minimal change, still discoverable.
-Cons: master-ledger export becomes one click deeper.
+## 3. Mixed RAG across LoBs in Executive view
 
-**Option C — Keep all, unify visual treatment**
-Standardize every export trigger to the same icon-only button (`FileDown`) with tooltip, drop the text labels entirely. Same surface area, less visual weight.
+Today every LoB ends up RED because:
 
-Pros: zero IA change, lowest risk before the demo.
-Cons: doesn't solve the "too many buttons" feeling, just makes them quieter.
+- LoB bar color in `ExecutiveView.tsx` L186 is RED if **any** Critical exists, else AMBER. With 1,800+ rows per LoB, at least one Critical is essentially guaranteed.
+- System Health uses `worst` ordering, same problem.
 
-**Recommendation: A**, with the Compliance per-row Export retained. Want me to wire that up after the data reset?
+Fixes:
 
-## Technical notes
-- All changes are presentation + mock-data layer; no schema, no backend.
-- `generateMockData` is deterministic (seeded 42) — same seed will regenerate the new realistic dataset on every refresh, so the demo is reproducible.
-- Reusing existing `makeChaseTimeline` + `makeLedgerFromChase` means ledger consistency is preserved for free once `resolutionStatus` is corrected.
+**(a) Per-LoB bias** — extend `SYSTEM_BIAS` with a parallel `LOB_BIAS` so:
 
-## Open question
-Confirm you want Option A for the export consolidation, or pick B / C — I'll implement the rest regardless.
+- `B2C` → healthy (mostly green, occasional amber)
+- `B2B` → mixed (green-dominant, recurring amber, rare red)
+- `Wheels` → stressed (the demo "hot" LoB, more red/amber)
+
+Picker becomes `pickRagState(rand, system, lob)` and multiplies the two bias vectors.
+
+**(b) LoB bar color uses breach *intensity*, not "any Critical".** Switch L186 to:
+
+```text
+ratio = critical / totalRows
+red    if ratio > 0.02
+amber  if ratio > 0.005 or breaches > 0
+green  otherwise
+```
+
+This way B2C/B2B render green or amber and only Wheels reads red — a realistic mix.
+
+**(c) System Health worst-state stays, but with the new biases plus smaller row count it will naturally show Core Banking/Auth Engine = GREEN, Payment Gateway = GREEN/AMBER, Document Cloud = AMBER, Data Warehouse = RED, CRM = GREEN. Sort by breaches desc (already done).**
+
+## 4. "All possibilities" demo strip
+
+For the demo you need every state visible somewhere. Two parts:
+
+**(a) Guaranteed-coverage seeding in `generateMockData`.** After the main loop, append 6 hand-crafted rows — one per RAG state (GREEN, AMBER, RED, GREY, BLUE, UNCONFIGURED) — pinned to recognizable system/LoB combos, each with a full chase timeline + micro-ledger so they look real in every view. These ride existing data structures, no schema change.
+
+**(b) New "Demo: All States" strip on the Executive dashboard.** A thin row above the existing scorecards, 6 mini-tiles (one per RAG state) showing the seeded KPI's id, system, status, and a "View" link that calls `openDrilldown('kpi', id)`. Labelled `DEMO ROSTER · ALL 5+1 RAG STATES` in muted caption type so it's obviously a presenter aid, not production noise. Easy to toggle off later with one prop.
+
+## 5. Out of scope for this pass
+
+- "br" → "breaches" copy fixes and the export-label rename were shipped in the previous round; nothing to redo unless you spot a missed instance.
+- No backend or schema changes — everything stays in `src/lib/mockData.ts`, `src/lib/exportLedger.ts`, `src/components/GlobalFilterBar.tsx`, `src/components/views/ExecutiveView.tsx`, plus button removals in `AdminHealthView.tsx`, `ComplianceView.tsx`, `DrilldownPanel.tsx`.
+
+## Open questions
+
+1. **Demo strip placement** — top of Executive (recommended, above scorecards) or a dedicated `?demo=1` overlay so it's hidden by default?  
+No don't put demo strip, the left pane with all the 7 views is part of the demo navigator, and this whole platform is a wireframing prototype, so no reason to put the word demo anywhere
+2. **Row count target** — 1,800 feels right for crisp numbers; want denser (~5,000) for a busier-looking grid?  
+No, don't make it busy, make is just enough fot it to look good enough for a demo
+3. **Wheels = stressed LoB** — happy with that, or pick a different LoB as the demo's hot zone?  
+that's okay but it sin't about just the lob, i also sow that in the macro view dashboard everything was red, and were not ordered according to the number of breaches in descending order, if the sorting of the system health is not ordered, order that as well
