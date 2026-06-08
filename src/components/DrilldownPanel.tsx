@@ -254,7 +254,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
   const commitEnableDep = (team: string, reason: string) => {
     const ts = new Date().toISOString();
     mutateRow(row.id, {
-      dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open' },
+      dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open', resolvedAt: null, resolvedBy: null, cascadeDismissed: false },
       stateFlags: [...row.stateFlags.filter(f => f !== 'Cross-Functional'), 'Cross-Functional'],
       chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${team}` }],
       ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency ENABLED', 'SPOC · You', `Notified ${team}${reason ? ` · ${reason}` : ''} · primary SLA timer paused`)),
