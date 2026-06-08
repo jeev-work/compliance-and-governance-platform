@@ -167,6 +167,8 @@ export type KPIRow = {
   timeToResolveMin: number | null;
   resolvedBy: string | null;
   severity: Severity;
+  impactTier: ImpactTier;       // static — set at KPI creation, never changes
+  urgencyScore: UrgencyScore;   // dynamic — recomputed from current RAG + risk
   riskScore: number;
   ledgerEntries: LedgerEntry[];
 };
@@ -343,13 +345,14 @@ export function generateMockData(count = 30000): KPIRow[] {
     const failureRate = breaches === 0 ? 0 : parseFloat(((breaches / baseVolume) * 100).toFixed(4));
     const status: KPIRow['status'] = ragState === 'RED' || ragState === 'AMBER' ? 'BREACHED' : 'CLEAN';
 
-    let severity: Severity = 'Low';
-    if (ragState === 'RED') severity = failureRate > 1 ? 'Critical' : failureRate > 0.5 ? 'High' : 'Medium';
-    else if (ragState === 'AMBER') severity = 'Medium';
-
     const riskScore = ragState === 'RED' ? Math.min(100, Math.round(40 + failureRate * 20))
                     : ragState === 'AMBER' ? Math.round(20 + failureRate * 10)
                     : ragState === 'GREY' ? 60 : 0;
+
+    // Severity = Impact × Urgency
+    const impactTier = getImpactTier(lob, system);
+    const urgencyScore = status === 'BREACHED' ? getUrgency(ragState, riskScore) : 1 as UrgencyScore;
+    const severity: Severity = sevMatrix(impactTier, urgencyScore);
 
     let resolutionStatus: KPIRow['resolutionStatus'] = 'Clean';
     let assignee: KPIRow['assignee'] = null;
