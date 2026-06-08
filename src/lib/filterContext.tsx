@@ -201,6 +201,42 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(t);
   }, []);
 
+  // Dependency cascade sweep — flip a small fraction of open child sub-tickets
+  // to "resolved" each tick so the auto-suggest banner shows up live during a demo.
+  useEffect(() => {
+    const sweep = () => {
+      setAllData(prev => {
+        let changed = false;
+        const nowIso = new Date().toISOString();
+        const next = prev.map(r => {
+          if (!r.dependency || r.dependency.status !== 'open') return r;
+          if (r.resolutionStatus === 'Resolved' || r.status === 'CLEAN') return r;
+          if (Math.random() > 0.03) return r;            // ~3% per tick
+          changed = true;
+          const entry = newEntry(
+            `Linked child ${r.dependency.linkedId} resolved by ${r.dependency.team}`,
+            'System · Dependency Bridge',
+            'Child sub-ticket closed — parent eligible for cascade close',
+          );
+          setMasterLedger(m => [...m, entry]);
+          return {
+            ...r,
+            dependency: {
+              ...r.dependency,
+              status: 'resolved' as const,
+              resolvedAt: nowIso,
+              resolvedBy: `${r.dependency.team} on-call`,
+            },
+            ledgerEntries: [...r.ledgerEntries, entry],
+          };
+        });
+        return changed ? next : prev;
+      });
+    };
+    const t = setInterval(sweep, 60_000);
+    return () => clearInterval(t);
+  }, []);
+
   const appendMaster = useCallback((e: LedgerEntry) => setMasterLedger(prev => [...prev, e]), []);
 
   const mutateRow = useCallback((id: string, patch: Partial<KPIRow>) => {
