@@ -76,7 +76,7 @@ export function ExecutiveView() {
       c.total++; c.breaches += r.breaches; if (r.executiveFlag) c.exec++;
       m.set(r.system, c);
     });
-    return Array.from(m.entries()).map(([name, d]) => ({ name, ...d }));
+    return Array.from(m.entries()).map(([name, d]) => ({ name, ...d })).sort((a, b) => b.breaches - a.breaches);
   }, [filteredData]);
 
   return (

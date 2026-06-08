@@ -202,13 +202,24 @@ function makeLedgerFromChase(
   return entries;
 }
 
-function pickRagState(rand: () => number): RagState {
+/** Per-system color bias so the System Health card looks realistically mixed instead of all-RED. */
+const SYSTEM_BIAS: Record<string, { green: number; amber: number; red: number; grey: number; blue: number }> = {
+  'Core Banking':    { green: 0.94, amber: 0.04, red: 0.005, grey: 0.005, blue: 0.008 },
+  'Payment Gateway': { green: 0.90, amber: 0.06, red: 0.02,  grey: 0.015, blue: 0.003 },
+  'CRM':             { green: 0.95, amber: 0.04, red: 0.005, grey: 0.003, blue: 0.000 },
+  'Document Cloud':  { green: 0.84, amber: 0.12, red: 0.03,  grey: 0.005, blue: 0.003 },
+  'Data Warehouse':  { green: 0.74, amber: 0.15, red: 0.09,  grey: 0.010, blue: 0.005 },
+  'Auth Engine':     { green: 0.96, amber: 0.03, red: 0.005, grey: 0.003, blue: 0.000 },
+};
+
+function pickRagState(rand: () => number, system?: string): RagState {
+  const b = (system && SYSTEM_BIAS[system]) || { green: 0.88, amber: 0.07, red: 0.03, grey: 0.01, blue: 0.008 };
   const r = rand();
-  if (r < 0.78) return 'GREEN';
-  if (r < 0.87) return 'AMBER';
-  if (r < 0.93) return 'RED';
-  if (r < 0.95) return 'GREY';
-  if (r < 0.99) return 'BLUE';
+  let acc = b.green;       if (r < acc) return 'GREEN';
+  acc += b.amber;          if (r < acc) return 'AMBER';
+  acc += b.red;            if (r < acc) return 'RED';
+  acc += b.grey;           if (r < acc) return 'GREY';
+  acc += b.blue;           if (r < acc) return 'BLUE';
   return 'UNCONFIGURED';
 }
 
@@ -236,7 +247,7 @@ export function generateMockData(count = 30000): KPIRow[] {
     const source = pick(rand, SOURCES);
     const lob = pick(rand, LOBS);
 
-    let ragState = pickRagState(rand);
+    let ragState = pickRagState(rand, system);
 
     // Cluster the Grey outage on a specific system + window
     const inOutageWindow = Math.abs(ts.getTime() - greyOutageStart.getTime()) < 6 * 3600000;
@@ -249,8 +260,8 @@ export function generateMockData(count = 30000): KPIRow[] {
 
     const baseVolume = Math.floor(rand() * 500000) + 1000;
     let breaches = 0;
-    if (ragState === 'AMBER') breaches = Math.floor(rand() * 50) + 1;
-    else if (ragState === 'RED') breaches = Math.floor(rand() * 1500) + 50;
+    if (ragState === 'AMBER') breaches = Math.floor(rand() * 20) + 1;       // 1–20 br
+    else if (ragState === 'RED') breaches = Math.floor(rand() * 75) + 5;    // 5–80 br
     const failureRate = breaches === 0 ? 0 : parseFloat(((breaches / baseVolume) * 100).toFixed(4));
     const status: KPIRow['status'] = ragState === 'RED' || ragState === 'AMBER' ? 'BREACHED' : 'CLEAN';
 
@@ -276,8 +287,20 @@ export function generateMockData(count = 30000): KPIRow[] {
     const stateFlags: StateFlag[] = [];
 
     if (status === 'BREACHED') {
+      // Age-aware lifecycle:
+      //   - Any breach older than 8h is force-closed (Resolved) — no stale "Investigating from 3 weeks ago".
+      //   - Fresh breaches (< 8h) get a realistic open distribution.
+      const ageHrs = (baseDate.getTime() - ts.getTime()) / 3600000;
       const r = rand();
-      resolutionStatus = r < 0.35 ? 'Resolved' : r < 0.55 ? 'Verifying' : r < 0.75 ? 'Investigating' : r < 0.9 ? 'Escalated to HOD' : 'Open';
+      if (ageHrs > 8) {
+        resolutionStatus = 'Resolved';
+      } else {
+        resolutionStatus = r < 0.30 ? 'Resolved'
+                         : r < 0.55 ? 'Verifying'
+                         : r < 0.78 ? 'Investigating'
+                         : r < 0.92 ? 'Escalated to HOD'
+                                    : 'Open';
+      }
       assignee = pick(rand, ASSIGNEES);
       timeToDetectMin = Math.floor(rand() * 120) + 1;
 
@@ -301,10 +324,10 @@ export function generateMockData(count = 30000): KPIRow[] {
         timeToResolveMin = Math.floor(rand() * budgetForRow) + 5;
         resolvedBy = pick(rand, ASSIGNEES).name;
       } else if (resolutionStatus === 'Resolved') {
-        timeToResolveMin = Math.floor(rand() * 2880) + 30;
+        timeToResolveMin = Math.floor(rand() * 240) + 15;     // 15m–4h, realistic
         resolvedBy = pick(rand, ASSIGNEES).name;
       }
-      if (resolutionStatus === 'Escalated to HOD') timeToEscalateMin = Math.floor(rand() * 480) + 15;
+      if (resolutionStatus === 'Escalated to HOD') timeToEscalateMin = Math.floor(rand() * 60) + 15;
 
       // Acknowledged vs Unacknowledged
       stateFlags.push(resolutionStatus === 'Open' ? 'Unacknowledged' : 'Acknowledged');

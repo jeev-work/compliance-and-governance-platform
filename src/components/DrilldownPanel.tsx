@@ -121,7 +121,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
                 <span className="font-mono font-semibold text-foreground">{r.id}</span>
                 <span className="text-muted-foreground">{r.lob}</span>
                 <span className={cn('font-bold font-mono px-1 rounded', RAG_BG[r.ragState])}>{r.ragState}</span>
-                {r.status === 'BREACHED' && <span className="font-mono rag-red">{r.breaches} br</span>}
+                {r.status === 'BREACHED' && <span className="font-mono rag-red">{r.breaches} breaches</span>}
                 {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
                 <span className="ml-auto text-muted-foreground">{r.resolutionStatus}</span>

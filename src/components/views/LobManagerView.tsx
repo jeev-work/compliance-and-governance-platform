@@ -97,7 +97,7 @@ export function LobManagerView() {
                             w === 'GREY' ? 'rag-grey' : w === 'BLUE' ? 'rag-blue' : 'rag-green')}>
                             {RAG_SHORT[w]}
                           </div>
-                          <div className="text-muted-foreground text-[9px]">{c.breaches > 0 ? `${c.breaches} br` : '—'}</div>
+                          <div className="text-muted-foreground text-[9px]">{c.breaches > 0 ? `${c.breaches} br.` : '—'}</div>
                         </div>
                       </td>
                     );
