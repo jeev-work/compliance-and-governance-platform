@@ -979,13 +979,33 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
         </div>
       )}
 
-      {/* Standard Reassign modal — dropdown of available people with phone numbers */}
+      {/* Standard Reassign modal — search box + LoB / Dept / Designation filters */}
       {reassignModal && (() => {
-        const selected = ASSIGNEES.find(a => a.name === reassignModal.assignee);
-        const pool = ASSIGNEES.filter(a => a.name !== row.assignee?.name);
+        const LOBS = ['B2B', 'B2C', 'Wheels'];
+        // Synthesize lob/dept/designation for each assignee from their role.
+        const enriched = ASSIGNEES.map((a, i) => {
+          const parts = a.role.split('·').map(s => s.trim());
+          const designation = parts[0] || a.role;
+          const dept = parts[1] ? parts[1].replace(/\s*SPOC$/i, '').trim() : 'Cross-system';
+          const lob = LOBS[i % LOBS.length];
+          return { ...a, designation, dept, lob };
+        });
+        const q = reassignModal.query.trim().toLowerCase();
+        const designationOptions = Array.from(new Set(enriched.map(e => e.designation))).sort();
+        const filtered = enriched.filter(e => {
+          if (e.name === row.assignee?.name) return false;
+          if (reassignModal.lobFilter && e.lob !== reassignModal.lobFilter) return false;
+          if (reassignModal.deptFilter && e.dept !== reassignModal.deptFilter) return false;
+          if (reassignModal.designationFilter && e.designation !== reassignModal.designationFilter) return false;
+          if (q) {
+            const hay = `${e.name} ${e.role} ${e.dept} ${e.lob} ${e.designation}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
         return (
           <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setReassignModal(null)}>
-            <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-card border border-border rounded-lg w-full max-w-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <User className="h-4 w-4 text-primary" /> Reassign Ticket
@@ -996,30 +1016,80 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
                 <div className="text-[10px] text-muted-foreground">
                   Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span> <ContactPhone name={row.assignee?.name} />
                 </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reassign To</label>
-                  <select
-                    value={reassignModal.assignee}
-                    onChange={(e) => setReassignModal({ ...reassignModal, assignee: e.target.value })}
-                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
-                  >
-                    {pool.map(a => (
-                      <option key={a.name} value={a.name}>{a.name} — {a.role} · {a.phone}</option>
-                    ))}
-                  </select>
-                  {selected && (
-                    <div className="mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <span>Contact before assigning:</span>
-                      <a
-                        href={`tel:${selected.phone.replace(/[^+\d]/g, '')}`}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary font-mono hover:bg-primary/20"
-                      >
-                        <Phone className="h-3 w-3" />{selected.phone}
-                      </a>
-                      <span className="text-muted-foreground">· {selected.role}</span>
-                    </div>
-                  )}
+
+                <div className="relative">
+                  <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <input
+                    value={reassignModal.query}
+                    onChange={(e) => setReassignModal({ ...reassignModal, query: e.target.value })}
+                    placeholder="Search by name, LoB, department, system, or designation…"
+                    className="w-full h-8 text-xs bg-secondary border border-border rounded pl-7 pr-2 focus:outline-none focus:border-primary/50"
+                  />
                 </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">LoB</label>
+                    <select
+                      value={reassignModal.lobFilter}
+                      onChange={(e) => setReassignModal({ ...reassignModal, lobFilter: e.target.value })}
+                      className="mt-1 w-full h-7 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      <option value="">All</option>
+                      {LOBS.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Department / System</label>
+                    <select
+                      value={reassignModal.deptFilter}
+                      onChange={(e) => setReassignModal({ ...reassignModal, deptFilter: e.target.value })}
+                      className="mt-1 w-full h-7 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      <option value="">All</option>
+                      {Array.from(new Set(enriched.map(e => e.dept))).sort().map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Designation</label>
+                    <select
+                      value={reassignModal.designationFilter}
+                      onChange={(e) => setReassignModal({ ...reassignModal, designationFilter: e.target.value })}
+                      className="mt-1 w-full h-7 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      <option value="">All</option>
+                      {designationOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="max-h-[220px] overflow-y-auto scrollbar-thin border border-border/60 rounded">
+                  {filtered.length === 0 && (
+                    <div className="text-[10px] text-muted-foreground italic text-center py-4">No candidates match these filters.</div>
+                  )}
+                  {filtered.map(c => {
+                    const active = reassignModal.assignee === c.name;
+                    return (
+                      <button
+                        key={c.name}
+                        onClick={() => setReassignModal({ ...reassignModal, assignee: c.name })}
+                        className={cn(
+                          'w-full text-left px-2.5 py-1.5 text-[11px] border-b border-border/40 hover:bg-accent/40',
+                          active && 'bg-primary/10',
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground">{c.name}</span>
+                          <span className="text-[9px] font-mono px-1 rounded bg-secondary border border-border text-muted-foreground">{c.lob}</span>
+                          <span className="text-[9px] font-mono px-1 rounded bg-secondary border border-border text-muted-foreground">{c.dept}</span>
+                          <span className="ml-auto font-mono text-[10px] text-muted-foreground">{c.phone}</span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{c.designation}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div>
                   <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Handover note (optional)</label>
                   <input
@@ -1043,6 +1113,54 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           </div>
         );
       })()}
+
+      {/* Resolve confirmation modal — captures a comment + media before closing the ticket. */}
+      {resolveModal && (
+        <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setResolveModal(null)}>
+          <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 rag-green" />
+                {resolveModal.mode === 'cascade' ? 'Verify & Close (cascade)' : 'Confirm Resolution'}
+              </h3>
+              <button onClick={() => setResolveModal(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">What was resolved? *</label>
+                <div className="mt-1">
+                  <CommentBoxWithMedia
+                    placeholder="Describe the fix, root cause, and any verification done"
+                    required
+                    rows={4}
+                    onChange={(s: CommentSubmission) => setResolveModal({ ...resolveModal, comment: s.text, attachments: s.attachments })}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button onClick={() => setResolveModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
+                <button
+                  disabled={!resolveModal.comment.trim()}
+                  onClick={() => {
+                    const m = resolveModal;
+                    setResolveModal(null);
+                    if (m.mode === 'cascade') runCascadeClose(m.comment, m.attachments);
+                    else runDeploy(m.comment, m.attachments);
+                  }}
+                  className={cn(
+                    'text-[11px] px-3 py-1 rounded border font-semibold flex items-center gap-1',
+                    resolveModal.comment.trim()
+                      ? 'bg-rag-green border-rag-green rag-green hover:opacity-80'
+                      : 'bg-secondary border-border text-muted-foreground opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  <CheckCircle2 className="h-3 w-3" /> Confirm Resolve
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
