@@ -186,6 +186,9 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel
           })}
           {sorted.length === 0 && <div className="text-[10px] text-muted-foreground italic text-center py-4">No KPIs in this intersection for the current filter scope.</div>}
         </div>
+        <div className="px-4 py-2 border-t border-border bg-accent/10 rounded-b-lg flex items-center gap-2">
+          <FooterExport onClick={() => { exportKpiRowsCsv(rows, `cell-${system}-${process}`); toast.success(`Exported ${rows.length} rows`); }} />
+        </div>
       </div>
     </div>
   );
