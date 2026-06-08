@@ -578,6 +578,9 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
           {actions.includes('executiveFlag') && (
             <ActionBtn icon={Flag} label={row.executiveFlag ? 'Reassign (Exec)' : 'Executive Flag'} onClick={openExecModal} variant="danger" />
           )}
+          {actions.includes('executiveFlag') && row.executiveFlag && (
+            <ActionBtn icon={Flag} label="Un-flag (Exec)" onClick={onUnflag} variant="amber" />
+          )}
           {actions.length === 0 && (
             <span className="text-[10px] text-muted-foreground italic">Read-only role · no actions available</span>
           )}
