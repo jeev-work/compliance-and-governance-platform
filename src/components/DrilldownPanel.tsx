@@ -886,7 +886,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
                     className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent"
                   >Cancel</button>
                   <button
-                    onClick={() => depModal.mode === 'enable' ? commitEnableDep(depModal.team, depModal.reason) : commitDisableDep()}
+                    onClick={() => depModal.mode === 'enable' ? commitEnableDep(depModal) : commitDisableDep()}
                     className={cn(
                       'text-[11px] px-3 py-1 rounded border font-semibold flex items-center gap-1',
                       depModal.mode === 'enable'
