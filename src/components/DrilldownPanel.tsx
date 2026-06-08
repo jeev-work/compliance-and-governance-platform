@@ -49,6 +49,18 @@ function newLedgerEntry(action: string, actor: string, details?: string, attachm
   return { timestamp: new Date().toISOString(), actor, action, hash: `LDG-${h}`, details, attachments };
 }
 
+/** "3m ago" / "2h ago" / "Mon 14:32" — friendly relative timestamp. */
+function relTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleString();
+
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green rag-green',
   AMBER: 'bg-rag-amber rag-amber',
