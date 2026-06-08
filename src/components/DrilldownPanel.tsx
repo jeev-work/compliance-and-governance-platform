@@ -414,7 +414,8 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
     && row.resolutionStatus !== 'Resolved'
     && row.status !== 'CLEAN';
 
-  const onCascadeClose = () => {
+  /** Cascade close — runs after user submits resolve comment box (cascade mode). */
+  const runCascadeClose = (note: string, attachments: string[]) => {
     if (!row.dependency) return;
     const dep = row.dependency;
     const ts = new Date().toISOString();
@@ -429,13 +430,13 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
         ...row.ledgerEntries,
         newLedgerEntry('Parent closure suggested by cascade rule', 'SPOC · You',
           `Triggered by child resolution: ${dep.linkedId} (${dep.team})`),
-        newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Cascade close — awaiting telemetry verification'),
+        newLedgerEntry('Resolution Deployed', 'SPOC · You',
+          note || 'Cascade close — awaiting telemetry verification', attachments),
       ],
     });
     toast.success(`Cascade close accepted — verifying telemetry (3s)…`);
     if (verifyTimer.current) clearTimeout(verifyTimer.current);
     verifyTimer.current = setTimeout(() => {
-      const closedAt = new Date().toISOString();
       mutateRow(row.id, {
         resolutionStatus: 'Resolved',
         status: 'CLEAN',
@@ -449,7 +450,8 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           ...row.ledgerEntries,
           newLedgerEntry('Parent closure suggested by cascade rule', 'SPOC · You',
             `Triggered by child resolution: ${dep.linkedId} (${dep.team})`),
-          newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Cascade close — awaiting telemetry verification'),
+          newLedgerEntry('Resolution Deployed', 'SPOC · You',
+            note || 'Cascade close — awaiting telemetry verification', attachments),
           newLedgerEntry('Ticket Closed', 'System · Telemetry', 'Cascade closure verified — RAG returned to GREEN'),
         ],
       });
@@ -582,7 +584,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
                 className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
               >Dismiss</button>
               <button
-                onClick={onCascadeClose}
+                onClick={() => setResolveModal({ mode: 'cascade', comment: '', attachments: [] })}
                 className="text-[11px] px-2.5 py-1 rounded border border-rag-green bg-rag-green rag-green font-semibold hover:opacity-80 flex items-center gap-1"
               >
                 <CheckCircle2 className="h-3 w-3" /> Verify &amp; Close
