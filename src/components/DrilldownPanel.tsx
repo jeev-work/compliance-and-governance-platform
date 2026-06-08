@@ -812,24 +812,46 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
 
             {depModal.mode === 'enable' && depModal.step === 'form' && (
               <div className="p-4 space-y-3">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Notify Team</label>
-                  <select
-                    value={depModal.team}
-                    onChange={(e) => setDepModal({ ...depModal, team: e.target.value })}
-                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
-                  >
-                    {DEPENDENCY_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Team</label>
+                    <select
+                      value={depModal.team}
+                      onChange={(e) => setDepModal({ ...depModal, team: e.target.value })}
+                      className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      {DEPENDENCY_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">System</label>
+                    <select
+                      value={depModal.system}
+                      onChange={(e) => setDepModal({ ...depModal, system: e.target.value })}
+                      className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      {registries.systems.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">LoB</label>
+                    <select
+                      value={depModal.lob}
+                      onChange={(e) => setDepModal({ ...depModal, lob: e.target.value })}
+                      className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      {registries.lobs.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reason (optional)</label>
-                  <input
-                    value={depModal.reason}
-                    onChange={(e) => setDepModal({ ...depModal, reason: e.target.value })}
-                    placeholder="e.g. upstream firewall rule blocking traffic"
-                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
-                  />
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Comment</label>
+                  <div className="mt-1">
+                    <CommentBoxWithMedia
+                      placeholder="Add a note"
+                      onChange={(s) => setDepModal({ ...depModal, comment: s.text, attachments: s.attachments })}
+                    />
+                  </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button onClick={() => setDepModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
