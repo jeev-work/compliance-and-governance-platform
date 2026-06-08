@@ -426,16 +426,18 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
           <TS icon={Clock} color="text-primary"  label="Time to Detect" value={fmtMinutes(row.timeToDetectMin)} />
           <TS
             icon={Timer}
-            color={countdown.tone === 'red' ? 'rag-red' : countdown.tone === 'amber' ? 'rag-amber' : countdown.tone === 'green' ? 'rag-green' : 'text-muted-foreground'}
-            label={countdown.overdue ? 'Escalate · OVERDUE' : 'Time to Escalate'}
-            value={countdown.label}
+            color={isClosed ? 'text-muted-foreground' : countdown.tone === 'red' ? 'rag-red' : countdown.tone === 'amber' ? 'rag-amber' : countdown.tone === 'green' ? 'rag-green' : 'text-muted-foreground'}
+            label={isClosed ? 'Time to Escalate' : countdown.overdue ? 'Escalate · OVERDUE' : 'Time to Escalate'}
+            value={isClosed ? '—' : countdown.label}
+            caption={isClosed ? 'ticket closed' : undefined}
           />
           <TS icon={CheckCircle2} color="rag-green" label="Time to Resolve" value={fmtMinutes(row.timeToResolveMin)} />
           <TS
             icon={Send}
             color="text-primary"
             label="Since Last Update"
-            value={sinceLastMin == null ? '—' : fmtMinutes(sinceLastMin)}
+            value={sinceLastDisplay}
+            caption={isClosed ? 'ticket closed' : undefined}
           />
           <div className="flex items-center gap-2">
             <User className="h-3.5 w-3.5 text-primary" />
