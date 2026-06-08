@@ -5,7 +5,7 @@ import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer, Phone,
+  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer, Phone, ArrowLeft,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
@@ -58,16 +58,18 @@ const RAG_BG: Record<RagState, string> = {
 };
 
 export function DrilldownPanel() {
-  const { drilldown, closeDrilldown, filteredData, openDrilldown } = useFilters();
+  const { drilldown, closeDrilldown, filteredData, openDrilldown, drilldownStack, popDrilldown } = useFilters();
   if (!drilldown.type) return null;
+  const canGoBack = drilldownStack.length > 0;
 
   if (drilldown.type === 'breach' && drilldown.row) {
-    return <BreachDetail row={drilldown.row} onClose={closeDrilldown} />;
+    return <BreachDetail row={drilldown.row} onClose={closeDrilldown} onBack={canGoBack ? popDrilldown : undefined} />;
   }
   if (drilldown.type === 'matrixCell' && drilldown.value) {
     const [sys, proc] = drilldown.value.split('||');
     const rows = filteredData.filter(r => r.system === sys && r.process === proc);
     return <MatrixCellDrilldown system={sys} process={proc} rows={rows} onClose={closeDrilldown}
+      onBack={canGoBack ? popDrilldown : undefined}
       onSelect={(row) => openDrilldown('breach', row.id, row)} />;
   }
   if (drilldown.type === 'system' || drilldown.type === 'process' || drilldown.type === 'lob') {
@@ -75,13 +77,27 @@ export function DrilldownPanel() {
     const v = drilldown.value!;
     const rows = filteredData.filter(r => r[k] === v);
     return <GroupDrilldown type={k} value={v} rows={rows} onClose={closeDrilldown}
+      onBack={canGoBack ? popDrilldown : undefined}
       onSelectBreach={(row) => openDrilldown('breach', row.id, row)} />;
   }
   return null;
 }
 
-function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
-  system: string; process: string; rows: KPIRow[]; onClose: () => void; onSelect: (r: KPIRow) => void;
+function BackButton({ onBack }: { onBack?: () => void }) {
+  if (!onBack) return null;
+  return (
+    <button
+      onClick={onBack}
+      className="p-1 hover:bg-accent rounded flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+      title="Back to previous drilldown"
+    >
+      <ArrowLeft className="h-3.5 w-3.5" /> Back
+    </button>
+  );
+}
+
+function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect }: {
+  system: string; process: string; rows: KPIRow[]; onClose: () => void; onBack?: () => void; onSelect: (r: KPIRow) => void;
 }) {
   const counts = rows.reduce((m, r) => { m[r.ragState] = (m[r.ragState] ?? 0) + 1; return m; }, {} as Record<RagState, number>);
   const sorted = [...rows].sort((a, b) => {
@@ -93,6 +109,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
+            <BackButton onBack={onBack} />
             <Shield className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-sm font-semibold">{system} × {process}</h2>
@@ -142,7 +159,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
   );
 }
 
-function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
+function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => void; onBack?: () => void }) {
   const { filters, mutateRow, configSnapshots } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
@@ -160,12 +177,22 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
   useEffect(() => { const t = setInterval(() => setNow(n => n + 1), 30000); return () => clearInterval(t); }, []);
 
   const countdown = escalationCountdown(row);
+  const isClosed = row.resolutionStatus === 'Resolved' || row.status === 'CLEAN';
 
-  // Time since the most recent state transition (chase event)
+  // Time since the most recent state transition (chase event).
+  // Hide for closed/clean rows (no longer meaningful); cap active rows at 72h+ so
+  // a stale demo timestamp never reads "1651h 53m".
   const lastEvent = row.chaseTimeline[row.chaseTimeline.length - 1];
-  const sinceLastMin = lastEvent
+  const sinceLastRawMin = lastEvent
     ? Math.max(0, Math.floor((Date.now() - new Date(lastEvent.timestamp).getTime()) / 60000))
     : null;
+  const sinceLastDisplay: string = isClosed
+    ? '—'
+    : sinceLastRawMin == null
+      ? '—'
+      : sinceLastRawMin >= 72 * 60
+        ? '72h+'
+        : fmtMinutes(sinceLastRawMin);
 
   const appendLedger = (entry: LedgerEntry) => [...row.ledgerEntries, entry];
 
@@ -258,6 +285,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     const ts = new Date().toISOString();
     mutateRow(row.id, {
       executiveFlag: true,
+      executiveFlagSetAt: ts,
       ragState: 'RED',
       resolutionStatus: 'Escalated to HOD',
       assignee: next,
@@ -265,7 +293,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
       chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Executive reassign → ${next.name}` }],
       ledgerEntries: [
         ...row.ledgerEntries,
-        newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation'),
+        newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation · auto-expires in 24h'),
         newLedgerEntry('Reassigned by Executive', 'Executive · You', `→ ${next.name} (${next.role})${reason ? ` · ${reason}` : ''}`),
       ],
     });
@@ -298,6 +326,14 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     exportMicroLedger({ kind: 'kpi', name: row.id }, row.ledgerEntries, configSnapshots, row);
     toast.success(`Audit exported · hash: ${row.auditLedgerId}`);
   };
+  const onUnflag = () => {
+    mutateRow(row.id, {
+      executiveFlag: false,
+      executiveFlagSetAt: null,
+      ledgerEntries: appendLedger(newLedgerEntry('Executive Flag cleared', 'Executive · You', 'Manual un-flag · SLA timers resume')),
+    });
+    toast.success(`Executive Flag cleared on ${row.id}`);
+  };
 
 
   return (
@@ -309,6 +345,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-3">
+            <BackButton onBack={onBack} />
             <AlertTriangle className={cn('h-5 w-5',
               row.severity === 'Critical' ? 'rag-red' : row.severity === 'High' ? 'rag-amber' : 'text-muted-foreground',
             )} />
@@ -399,16 +436,18 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           <TS icon={Clock} color="text-primary"  label="Time to Detect" value={fmtMinutes(row.timeToDetectMin)} />
           <TS
             icon={Timer}
-            color={countdown.tone === 'red' ? 'rag-red' : countdown.tone === 'amber' ? 'rag-amber' : countdown.tone === 'green' ? 'rag-green' : 'text-muted-foreground'}
-            label={countdown.overdue ? 'Escalate · OVERDUE' : 'Time to Escalate'}
-            value={countdown.label}
+            color={isClosed ? 'text-muted-foreground' : countdown.tone === 'red' ? 'rag-red' : countdown.tone === 'amber' ? 'rag-amber' : countdown.tone === 'green' ? 'rag-green' : 'text-muted-foreground'}
+            label={isClosed ? 'Time to Escalate' : countdown.overdue ? 'Escalate · OVERDUE' : 'Time to Escalate'}
+            value={isClosed ? '—' : countdown.label}
+            caption={isClosed ? 'ticket closed' : undefined}
           />
           <TS icon={CheckCircle2} color="rag-green" label="Time to Resolve" value={fmtMinutes(row.timeToResolveMin)} />
           <TS
             icon={Send}
             color="text-primary"
             label="Since Last Update"
-            value={sinceLastMin == null ? '—' : fmtMinutes(sinceLastMin)}
+            value={sinceLastDisplay}
+            caption={isClosed ? 'ticket closed' : undefined}
           />
           <div className="flex items-center gap-2">
             <User className="h-3.5 w-3.5 text-primary" />
@@ -538,6 +577,9 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
           {actions.includes('escalate') && <ActionBtn icon={ArrowUpRight} label="Escalate" onClick={onEscalate} variant="amber" />}
           {actions.includes('executiveFlag') && (
             <ActionBtn icon={Flag} label={row.executiveFlag ? 'Reassign (Exec)' : 'Executive Flag'} onClick={openExecModal} variant="danger" />
+          )}
+          {actions.includes('executiveFlag') && row.executiveFlag && (
+            <ActionBtn icon={Flag} label="Un-flag (Exec)" onClick={onUnflag} variant="amber" />
           )}
           {actions.length === 0 && (
             <span className="text-[10px] text-muted-foreground italic">Read-only role · no actions available</span>
@@ -792,20 +834,21 @@ function ActionBtn({ icon: Icon, label, onClick, variant = 'default', disabled =
   );
 }
 
-function TS({ icon: Icon, color, label, value }: { icon: any; color: string; label: string; value: string }) {
+function TS({ icon: Icon, color, label, value, caption }: { icon: any; color: string; label: string; value: string; caption?: string }) {
   return (
     <div className="flex items-center gap-2">
       <Icon className={cn('h-3.5 w-3.5', color)} />
       <div>
         <div className="text-[9px] text-muted-foreground uppercase">{label}</div>
         <div className="text-xs font-mono font-semibold">{value}</div>
+        {caption && <div className="text-[9px] text-muted-foreground italic">{caption}</div>}
       </div>
     </div>
   );
 }
 
-function GroupDrilldown({ type, value, rows, onClose, onSelectBreach }: {
-  type: 'system' | 'process' | 'lob'; value: string; rows: any[]; onClose: () => void; onSelectBreach: (row: KPIRow) => void;
+function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: {
+  type: 'system' | 'process' | 'lob'; value: string; rows: any[]; onClose: () => void; onBack?: () => void; onSelectBreach: (row: KPIRow) => void;
 }) {
   const breached = rows.filter(r => r.status === 'BREACHED');
   const totalBreaches = rows.reduce((s, r) => s + r.breaches, 0);
@@ -824,6 +867,7 @@ function GroupDrilldown({ type, value, rows, onClose, onSelectBreach }: {
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
+            <BackButton onBack={onBack} />
             <Shield className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-sm font-semibold">{value}</h2>

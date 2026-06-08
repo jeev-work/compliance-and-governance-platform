@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useMemo, ReactNode, useCallback, useEffect } from 'react';
 import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag, LedgerEntry, SlaVersionRecord } from './mockData';
 
 export type Role = 'executive' | 'lobManager' | 'spoc' | 'compliance' | 'analyst' | 'admin';
@@ -50,7 +50,9 @@ type Ctx = {
   allData: KPIRow[];
   historyView: HistoryView;
   drilldown: DrilldownState;
+  drilldownStack: DrilldownState[];
   openDrilldown: (type: DrilldownState['type'], value: string | null, row?: KPIRow | null) => void;
+  popDrilldown: () => void;
   closeDrilldown: () => void;
   mutateRow: (id: string, patch: Partial<KPIRow>) => void;
 
@@ -127,6 +129,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     searchQuery: '',
   });
   const [drilldown, setDrilldown] = useState<DrilldownState>({ type: null, value: null, row: null });
+  const [drilldownStack, setDrilldownStack] = useState<DrilldownState[]>([]);
 
   const [registries, setRegistries] = useState<Registries>({
     lobs: [...FILTER_OPTIONS.LOBS],
@@ -154,9 +157,49 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   });
 
   const openDrilldown = useCallback((type: DrilldownState['type'], value: string | null, row?: KPIRow | null) => {
-    setDrilldown({ type, value, row: row ?? null });
+    setDrilldown(prev => {
+      if (prev.type) setDrilldownStack(s => [...s.slice(-2), prev]); // keep last 3
+      return { type, value, row: row ?? null };
+    });
   }, []);
-  const closeDrilldown = useCallback(() => setDrilldown({ type: null, value: null, row: null }), []);
+  const popDrilldown = useCallback(() => {
+    setDrilldownStack(s => {
+      if (s.length === 0) { setDrilldown({ type: null, value: null, row: null }); return s; }
+      const prev = s[s.length - 1];
+      setDrilldown(prev);
+      return s.slice(0, -1);
+    });
+  }, []);
+  const closeDrilldown = useCallback(() => {
+    setDrilldown({ type: null, value: null, row: null });
+    setDrilldownStack([]);
+  }, []);
+
+  // B2: Executive Flag auto-expiry sweep (24h)
+  useEffect(() => {
+    const sweep = () => {
+      const now = Date.now();
+      setAllData(prev => {
+        let changed = false;
+        const next = prev.map(r => {
+          if (r.executiveFlag && r.executiveFlagSetAt) {
+            const ageH = (now - new Date(r.executiveFlagSetAt).getTime()) / 3600000;
+            if (ageH > 24) {
+              changed = true;
+              const entry = newEntry('Executive Flag auto-expired (24h)', 'System', `KPI ${r.id} · flag cleared after timeout`);
+              setMasterLedger(m => [...m, entry]);
+              return { ...r, executiveFlag: false, executiveFlagSetAt: null, ledgerEntries: [...r.ledgerEntries, entry] };
+            }
+          }
+          return r;
+        });
+        return changed ? next : prev;
+      });
+    };
+    sweep();
+    const t = setInterval(sweep, 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const appendMaster = useCallback((e: LedgerEntry) => setMasterLedger(prev => [...prev, e]), []);
 
@@ -205,7 +248,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       stateFlags: ['Unconfigured'],
       assignee: { name: input.spoc, role: 'KPI SPOC' },
       escalations: [], comments: [], chaseTimeline: [], dependency: null,
-      executiveFlag: false, auditLedgerId: fakeHash('LDG'),
+      executiveFlag: false, executiveFlagSetAt: null, auditLedgerId: fakeHash('LDG'),
       maintenanceWindow: null,
       timeToDetectMin: null, timeToEscalateMin: null, timeToResolveMin: null,
       resolvedBy: null, severity: input.severity, riskScore: 0,
@@ -271,7 +314,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   return (
     <FilterContext.Provider value={{
       filters, setFilters, filteredData, allData, historyView,
-      drilldown, openDrilldown, closeDrilldown, mutateRow,
+      drilldown, drilldownStack, openDrilldown, popDrilldown, closeDrilldown, mutateRow,
       registries, addLob, addSystem, addKpi,
       masterLedger, lobLedgers, systemLedgers, configSnapshots,
     }}>
