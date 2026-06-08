@@ -22,15 +22,14 @@ function stamp(entries: LedgerEntry[], snapshots: ConfigSnapshot[]) {
 }
 
 export function exportMasterLedger(master: LedgerEntry[], snapshots: ConfigSnapshot[]) {
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    integrityNote:
-      'Each ledger row references the configSnapshot active at the moment the event was recorded. ' +
-      'RAG/breach counts in historical rows reflect thresholds in effect at that time — NOT the current configuration.',
-    configSnapshots: snapshots,
-    masterLedger: stamp(master, snapshots),
-  };
-  download(`master-ledger-${Date.now()}.json`, JSON.stringify(payload, null, 2));
+  const stamped = stamp(master, snapshots);
+  const header = ['timestamp', 'actor', 'action', 'details', 'hash', 'config_snapshot_id_at_event', 'config_rules_at_event'];
+  const rows: string[] = [csvRow(header)];
+  for (const e of stamped) {
+    rows.push(csvRow([e.timestamp, e.actor, e.action, e.details ?? '', e.hash, e.configSnapshotId ?? '', e.configRules ?? '']));
+  }
+  const csv = rows.join('\r\n') + '\r\n';
+  download(`master-ledger-${Date.now()}.csv`, csv, 'text/csv;charset=utf-8');
 }
 
 /* -------- CSV helpers -------- */
