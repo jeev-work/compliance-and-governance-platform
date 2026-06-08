@@ -195,7 +195,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel
 }
 
 function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClose: () => void; onBack: () => void; backLabel?: string }) {
-  const { filters, mutateRow, configSnapshots } = useFilters();
+  const { filters, mutateRow, configSnapshots, registries } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
   // Dependency toggle modal state
@@ -254,7 +254,8 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
   const verifyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (verifyTimer.current) clearTimeout(verifyTimer.current); }, []);
 
-  const onDeploy = () => {
+  /** Standard resolve flow — runs after the Resolve comment box is submitted. */
+  const runDeploy = (note: string, attachments: string[]) => {
     const now = new Date().toISOString();
     mutateRow(row.id, {
       resolutionStatus: 'Verifying',
@@ -263,7 +264,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
         { step: 'Resolved', timestamp: now, actor: 'You' },
         { step: 'Verifying', timestamp: now, actor: 'System' },
       ],
-      ledgerEntries: appendLedger(newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification')),
+      ledgerEntries: appendLedger(newLedgerEntry('Resolution Deployed', 'SPOC · You', note || 'Awaiting telemetry verification', attachments)),
     });
     toast.success(`Deploy Resolution sent — verifying telemetry (3s)…`);
 
@@ -286,7 +287,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
         ],
         ledgerEntries: [
           ...row.ledgerEntries,
-          newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification'),
+          newLedgerEntry('Resolution Deployed', 'SPOC · You', note || 'Awaiting telemetry verification', attachments),
           newLedgerEntry('Ticket Closed', 'System · Telemetry', 'RAG returned to GREEN'),
         ],
       });
