@@ -127,6 +127,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     stateFlags: [],
     ragStates: [],
     severities: [],
+    impacts: [],
     searchQuery: '',
   });
   const [drilldown, setDrilldown] = useState<DrilldownState>({ type: null, value: null, row: null });
@@ -328,6 +329,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       if (filters.processes.length && !filters.processes.includes(row.process)) return false;
       if (filters.ragStates.length && !filters.ragStates.includes(row.ragState)) return false;
       if (filters.severities.length && (row.status !== 'BREACHED' || !filters.severities.includes(row.severity))) return false;
+      if (filters.impacts.length && !filters.impacts.includes(row.impactTier)) return false;
       if (filters.stateFlags.length && !filters.stateFlags.some(f => row.stateFlags.includes(f))) return false;
       if (q) {
         const hay = `${row.id} ${row.system} ${row.process} ${row.lob} ${row.assignee?.name ?? ''} ${row.auditLedgerId} ${row.resolutionStatus}`.toLowerCase();
