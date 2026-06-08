@@ -11,6 +11,16 @@ import { toast } from 'sonner';
 
 type AuthoringMode = null | 'kpi' | 'lob' | 'system';
 
+const CONNECTOR_INCIDENTS: { title: string; detail: string; timeAgo: string; action: string; severity: 'high' | 'medium' | 'low' }[] = [
+  { title: 'Schema drift detected', detail: 'payments_v2.metric_alerts — 3 new columns ignored by ingest mapper', timeAgo: '12m ago', action: 'Update mapper schema', severity: 'medium' },
+  { title: 'Auth token rotated upstream', detail: 'AppDynamics service account — last successful poll 18m ago', timeAgo: '18m ago', action: 'Re-issue API token', severity: 'high' },
+  { title: 'Rate limit (HTTP 429)', detail: 'Metrics API backing off · 6 retries scheduled', timeAgo: '4m ago', action: 'Throttle ingest interval', severity: 'medium' },
+  { title: 'Webhook signature mismatch', detail: 'Incident provider — 14 events rejected as untrusted', timeAgo: '27m ago', action: 'Rotate shared secret', severity: 'high' },
+  { title: 'Stale heartbeat', detail: 'ServiceNow connector idle 42m (threshold 15m)', timeAgo: '42m ago', action: 'Restart connector pod', severity: 'high' },
+  { title: 'Connector outage cleared', detail: 'Payment Gateway · resumed after 6h grey-state window', timeAgo: '1h ago', action: 'Backfill missed window', severity: 'low' },
+  { title: 'DNS resolution flapping', detail: 'metrics.internal — 18% intermittent NXDOMAIN', timeAgo: '8m ago', action: 'Check resolver overrides', severity: 'medium' },
+];
+
 export function AdminHealthView() {
   const {
     filteredData, allData, registries, addLob, addSystem, addKpi,
