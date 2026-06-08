@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, ReactNode, useCallback, useEffect } from 'react';
-import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag, LedgerEntry, SlaVersionRecord } from './mockData';
+import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag, LedgerEntry, SlaVersionRecord, ImpactTier, getImpactTier } from './mockData';
 
 export type Role = 'executive' | 'lobManager' | 'spoc' | 'compliance' | 'analyst' | 'admin';
 
@@ -287,7 +287,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       executiveFlag: false, executiveFlagSetAt: null, auditLedgerId: fakeHash('LDG'),
       maintenanceWindow: null,
       timeToDetectMin: null, timeToEscalateMin: null, timeToResolveMin: null,
-      resolvedBy: null, severity: input.severity, riskScore: 0,
+      resolvedBy: null, severity: input.severity, impactTier: getImpactTier(input.lob, input.system), urgencyScore: 1, riskScore: 0,
       ledgerEntries: ledger,
     };
     setAllData(prev => [row, ...prev]);
