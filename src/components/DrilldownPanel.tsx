@@ -142,6 +142,9 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect 
                 {r.status === 'BREACHED' && <span className="font-mono rag-red">{r.breaches} breaches</span>}
                 {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
+                {r.dependency?.status === 'resolved' && !r.dependency.cascadeDismissed && r.resolutionStatus !== 'Resolved' && (
+                  <span className="text-[9px] px-1 py-0.5 rounded font-semibold bg-rag-green rag-green border border-rag-green">↩ child resolved</span>
+                )}
                 <span className="ml-auto text-muted-foreground">{r.resolutionStatus}</span>
                 {r.assignee && <span className="text-muted-foreground">→ {r.assignee.name} <ContactPhone name={r.assignee.name} /></span>}
                 {r.status === 'BREACHED' && (
@@ -254,7 +257,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
   const commitEnableDep = (team: string, reason: string) => {
     const ts = new Date().toISOString();
     mutateRow(row.id, {
-      dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open' },
+      dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open', resolvedAt: null, resolvedBy: null, cascadeDismissed: false },
       stateFlags: [...row.stateFlags.filter(f => f !== 'Cross-Functional'), 'Cross-Functional'],
       chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${team}` }],
       ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency ENABLED', 'SPOC · You', `Notified ${team}${reason ? ` · ${reason}` : ''} · primary SLA timer paused`)),
@@ -335,6 +338,67 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
     toast.success(`Executive Flag cleared on ${row.id}`);
   };
 
+  // Cascade auto-suggest: child sub-ticket resolved → offer to verify & close parent.
+  const showCascadeBanner = !!row.dependency
+    && row.dependency.status === 'resolved'
+    && !row.dependency.cascadeDismissed
+    && row.resolutionStatus !== 'Resolved'
+    && row.status !== 'CLEAN';
+
+  const onCascadeClose = () => {
+    if (!row.dependency) return;
+    const dep = row.dependency;
+    const ts = new Date().toISOString();
+    mutateRow(row.id, {
+      resolutionStatus: 'Verifying',
+      stateFlags: row.stateFlags.filter(f => f !== 'Unacknowledged').concat('Verifying'),
+      chaseTimeline: [...row.chaseTimeline,
+        { step: 'Resolved', timestamp: ts, actor: 'You · cascade' },
+        { step: 'Verifying', timestamp: ts, actor: 'System' },
+      ],
+      ledgerEntries: [
+        ...row.ledgerEntries,
+        newLedgerEntry('Parent closure suggested by cascade rule', 'SPOC · You',
+          `Triggered by child resolution: ${dep.linkedId} (${dep.team})`),
+        newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Cascade close — awaiting telemetry verification'),
+      ],
+    });
+    toast.success(`Cascade close accepted — verifying telemetry (3s)…`);
+    if (verifyTimer.current) clearTimeout(verifyTimer.current);
+    verifyTimer.current = setTimeout(() => {
+      const closedAt = new Date().toISOString();
+      mutateRow(row.id, {
+        resolutionStatus: 'Resolved',
+        status: 'CLEAN',
+        ragState: 'GREEN',
+        severity: 'Low',
+        riskScore: 0,
+        breaches: 0,
+        failureRate: 0,
+        stateFlags: row.stateFlags.filter(f => f !== 'Unacknowledged' && f !== 'Verifying' && f !== 'Escalated'),
+        ledgerEntries: [
+          ...row.ledgerEntries,
+          newLedgerEntry('Parent closure suggested by cascade rule', 'SPOC · You',
+            `Triggered by child resolution: ${dep.linkedId} (${dep.team})`),
+          newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Cascade close — awaiting telemetry verification'),
+          newLedgerEntry('Ticket Closed', 'System · Telemetry', 'Cascade closure verified — RAG returned to GREEN'),
+        ],
+      });
+      toast.success(`${row.id} closed via cascade — RAG back to GREEN`);
+    }, 3000);
+  };
+
+  const onCascadeDismiss = () => {
+    if (!row.dependency) return;
+    mutateRow(row.id, {
+      dependency: { ...row.dependency, cascadeDismissed: true },
+      ledgerEntries: appendLedger(newLedgerEntry('Cascade suggestion dismissed', 'SPOC · You',
+        `Parent kept open despite child ${row.dependency.linkedId} resolution`)),
+    });
+    toast.message(`Cascade suggestion dismissed for ${row.id}`);
+  };
+
+
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-8 overflow-y-auto">
@@ -408,6 +472,36 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Cascade auto-suggest banner — child resolved, prompt parent close */}
+        {showCascadeBanner && row.dependency && (
+          <div className="mx-4 my-3 px-3 py-2.5 rounded border border-rag-green bg-rag-green flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 rag-green shrink-0 mt-0.5" />
+            <div className="flex-1 text-[11px]">
+              <div className="font-semibold text-foreground">
+                Dependency <span className="font-mono">{row.dependency.linkedId}</span> resolved by {row.dependency.resolvedBy ?? row.dependency.team}
+                {row.dependency.resolvedAt && (
+                  <span className="text-muted-foreground font-normal"> · {new Date(row.dependency.resolvedAt).toLocaleString()}</span>
+                )}
+              </div>
+              <div className="text-muted-foreground mt-0.5">
+                The blocking child ticket is closed. Verify telemetry and close this parent KPI?
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={onCascadeDismiss}
+                className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+              >Dismiss</button>
+              <button
+                onClick={onCascadeClose}
+                className="text-[11px] px-2.5 py-1 rounded border border-rag-green bg-rag-green rag-green font-semibold hover:opacity-80 flex items-center gap-1"
+              >
+                <CheckCircle2 className="h-3 w-3" /> Verify &amp; Close
+              </button>
             </div>
           </div>
         )}
@@ -914,6 +1008,9 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: 
                 <span className={cn('font-semibold', row.severity === 'Critical' ? 'rag-red' : 'rag-amber')}>{row.severity}</span>
                 <span className="font-mono rag-red">{row.breaches} breaches</span>
                 {row.executiveFlag && <ShieldAlert className="h-3 w-3 rag-red" />}
+                {row.dependency?.status === 'resolved' && !row.dependency.cascadeDismissed && row.resolutionStatus !== 'Resolved' && (
+                  <span className="text-[9px] px-1 py-0.5 rounded font-semibold bg-rag-green rag-green border border-rag-green">↩ child resolved</span>
+                )}
                 <span className="ml-auto text-muted-foreground">{row.resolutionStatus}</span>
                 {row.assignee && <span className="text-muted-foreground">→ {row.assignee.name} <ContactPhone name={row.assignee.name} /></span>}
               </div>

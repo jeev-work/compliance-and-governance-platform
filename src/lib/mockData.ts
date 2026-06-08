@@ -65,7 +65,15 @@ export type ChaseStep =
 export type EscalationEntry = { from: string; to: string; timestamp: string; reason: string };
 export type CommentEntry = { author: string; role: string; timestamp: string; text: string };
 export type ChaseEvent = { step: ChaseStep; timestamp: string; actor: string };
-export type DependencyFork = { team: string; timestamp: string; linkedId: string; status: 'open' | 'resolved' };
+export type DependencyFork = {
+  team: string;
+  timestamp: string;
+  linkedId: string;
+  status: 'open' | 'resolved';
+  resolvedAt: string | null;        // ts when child sub-ticket closed
+  resolvedBy: string | null;        // on-call actor on the child team
+  cascadeDismissed: boolean;        // SPOC explicitly dismissed the auto-suggest banner
+};
 export type LedgerEntry = { timestamp: string; actor: string; action: string; hash: string; details?: string };
 
 /** Per-KPI SLA version history — each KPI carries its own threshold trail. */
@@ -358,11 +366,19 @@ export function generateMockData(count = 30000): KPIRow[] {
 
       // ~2% of Red get cross-functional dependency forks
       if (ragState === 'RED' && rand() < 0.18) {
+        const depTeam = pick(rand, DEPENDENCY_TEAMS);
+        const depTs = new Date(ts.getTime() + 45 * 60000);
+        const childResolved = rand() < 0.5;
         dependency = {
-          team: pick(rand, DEPENDENCY_TEAMS),
-          timestamp: new Date(ts.getTime() + 45 * 60000).toISOString(),
+          team: depTeam,
+          timestamp: depTs.toISOString(),
           linkedId: `SUB-${10000 + Math.floor(rand() * 20000)}`,
-          status: rand() < 0.5 ? 'open' : 'resolved',
+          status: childResolved ? 'resolved' : 'open',
+          resolvedAt: childResolved
+            ? new Date(depTs.getTime() + Math.floor(rand() * 3 + 1) * 3600 * 1000).toISOString()
+            : null,
+          resolvedBy: childResolved ? `${depTeam} on-call` : null,
+          cascadeDismissed: false,
         };
         stateFlags.push('Cross-Functional');
       }
