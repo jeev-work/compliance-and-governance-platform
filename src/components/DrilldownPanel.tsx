@@ -445,9 +445,25 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
         </div>
 
-        {/* RAG strip + SLA Version */}
-        <div className="px-4 py-2 border-b border-border flex items-center gap-3 text-[10px]">
+        {/* RAG strip + SLA Version + Severity = Impact × Urgency */}
+        <div className="px-4 py-2 border-b border-border flex items-center gap-3 text-[10px] flex-wrap">
           <span className={cn('px-2 py-0.5 rounded font-bold', RAG_BG[row.ragState])}>{row.ragState}</span>
+          <span
+            className={cn(
+              'px-1.5 py-0.5 rounded font-mono font-bold border',
+              row.impactTier === 'T1' ? 'rag-red border-rag-red bg-rag-red'
+              : row.impactTier === 'T2' ? 'rag-amber border-rag-amber bg-rag-amber'
+              : row.impactTier === 'T3' ? 'text-chart-5 border-chart-5'
+              : 'text-muted-foreground border-border',
+            )}
+            title={IMPACT_LABEL[row.impactTier]}
+          >
+            Impact {row.impactTier}
+          </span>
+          <span className="text-muted-foreground" title="Dynamic: how close this breach is to going critical right now">
+            Urgency <span className="font-mono text-foreground">{row.urgencyScore}/4</span>
+          </span>
+          <span className="text-muted-foreground">Sev = Impact × Urgency = <span className="font-mono text-foreground">{row.severity}</span></span>
           <span className="text-muted-foreground">SLA: <span className="font-mono text-foreground">{row.slaVersion}</span></span>
           <span className="text-muted-foreground">Ledger: <span className="font-mono text-foreground">{row.auditLedgerId}</span></span>
           {row.maintenanceWindow && (
