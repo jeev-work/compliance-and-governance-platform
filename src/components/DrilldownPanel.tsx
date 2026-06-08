@@ -285,6 +285,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
     const ts = new Date().toISOString();
     mutateRow(row.id, {
       executiveFlag: true,
+      executiveFlagSetAt: ts,
       ragState: 'RED',
       resolutionStatus: 'Escalated to HOD',
       assignee: next,
@@ -292,7 +293,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
       chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Executive reassign → ${next.name}` }],
       ledgerEntries: [
         ...row.ledgerEntries,
-        newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation'),
+        newLedgerEntry('EXECUTIVE FLAG raised', 'Executive · You', 'SLA timer nullified · Level 2 escalation · auto-expires in 24h'),
         newLedgerEntry('Reassigned by Executive', 'Executive · You', `→ ${next.name} (${next.role})${reason ? ` · ${reason}` : ''}`),
       ],
     });
@@ -325,6 +326,14 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
     exportMicroLedger({ kind: 'kpi', name: row.id }, row.ledgerEntries, configSnapshots, row);
     toast.success(`Audit exported · hash: ${row.auditLedgerId}`);
   };
+  const onUnflag = () => {
+    mutateRow(row.id, {
+      executiveFlag: false,
+      executiveFlagSetAt: null,
+      ledgerEntries: appendLedger(newLedgerEntry('Executive Flag cleared', 'Executive · You', 'Manual un-flag · SLA timers resume')),
+    });
+    toast.success(`Executive Flag cleared on ${row.id}`);
+  };
 
 
   return (
@@ -336,6 +345,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-3">
+            <BackButton onBack={onBack} />
             <AlertTriangle className={cn('h-5 w-5',
               row.severity === 'Critical' ? 'rag-red' : row.severity === 'High' ? 'rag-amber' : 'text-muted-foreground',
             )} />
