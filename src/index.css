@@ -47,6 +47,8 @@
     --rag-grey-bg: 220 9% 55% / 0.12;
     --rag-blue: 199 89% 58%;
     --rag-blue-bg: 199 89% 58% / 0.12;
+    --rag-unconfigured: 265 20% 55%;
+    --rag-unconfigured-bg: 265 20% 55% / 0.12;
 
     --chart-1: 210 100% 56%;
     --chart-2: 142 71% 45%;
@@ -96,10 +98,11 @@
   .border-rag-blue  { border-color: hsl(var(--rag-blue) / 0.3); }
 
   .rag-unconfigured {
-    color: hsl(var(--muted-foreground));
-    border: 1px dashed hsl(var(--muted-foreground) / 0.5);
-    background: hsl(var(--muted) / 0.4);
+    color: hsl(var(--rag-unconfigured));
+    border: 1px dashed hsl(var(--rag-unconfigured) / 0.6);
+    background: hsl(var(--rag-unconfigured-bg));
   }
+  .border-rag-unconfigured { border-color: hsl(var(--rag-unconfigured) / 0.5); border-style: dashed; }
 
   .text-chart-5 { color: hsl(var(--chart-5)); }
 
