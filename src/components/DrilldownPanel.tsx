@@ -177,12 +177,22 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
   useEffect(() => { const t = setInterval(() => setNow(n => n + 1), 30000); return () => clearInterval(t); }, []);
 
   const countdown = escalationCountdown(row);
+  const isClosed = row.resolutionStatus === 'Resolved' || row.status === 'CLEAN';
 
-  // Time since the most recent state transition (chase event)
+  // Time since the most recent state transition (chase event).
+  // Hide for closed/clean rows (no longer meaningful); cap active rows at 72h+ so
+  // a stale demo timestamp never reads "1651h 53m".
   const lastEvent = row.chaseTimeline[row.chaseTimeline.length - 1];
-  const sinceLastMin = lastEvent
+  const sinceLastRawMin = lastEvent
     ? Math.max(0, Math.floor((Date.now() - new Date(lastEvent.timestamp).getTime()) / 60000))
     : null;
+  const sinceLastDisplay: string = isClosed
+    ? '—'
+    : sinceLastRawMin == null
+      ? '—'
+      : sinceLastRawMin >= 72 * 60
+        ? '72h+'
+        : fmtMinutes(sinceLastRawMin);
 
   const appendLedger = (entry: LedgerEntry) => [...row.ledgerEntries, entry];
 
