@@ -5,7 +5,7 @@ import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer, Phone,
+  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer, Phone, ArrowLeft,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
@@ -58,16 +58,18 @@ const RAG_BG: Record<RagState, string> = {
 };
 
 export function DrilldownPanel() {
-  const { drilldown, closeDrilldown, filteredData, openDrilldown } = useFilters();
+  const { drilldown, closeDrilldown, filteredData, openDrilldown, drilldownStack, popDrilldown } = useFilters();
   if (!drilldown.type) return null;
+  const canGoBack = drilldownStack.length > 0;
 
   if (drilldown.type === 'breach' && drilldown.row) {
-    return <BreachDetail row={drilldown.row} onClose={closeDrilldown} />;
+    return <BreachDetail row={drilldown.row} onClose={closeDrilldown} onBack={canGoBack ? popDrilldown : undefined} />;
   }
   if (drilldown.type === 'matrixCell' && drilldown.value) {
     const [sys, proc] = drilldown.value.split('||');
     const rows = filteredData.filter(r => r.system === sys && r.process === proc);
     return <MatrixCellDrilldown system={sys} process={proc} rows={rows} onClose={closeDrilldown}
+      onBack={canGoBack ? popDrilldown : undefined}
       onSelect={(row) => openDrilldown('breach', row.id, row)} />;
   }
   if (drilldown.type === 'system' || drilldown.type === 'process' || drilldown.type === 'lob') {
@@ -75,9 +77,23 @@ export function DrilldownPanel() {
     const v = drilldown.value!;
     const rows = filteredData.filter(r => r[k] === v);
     return <GroupDrilldown type={k} value={v} rows={rows} onClose={closeDrilldown}
+      onBack={canGoBack ? popDrilldown : undefined}
       onSelectBreach={(row) => openDrilldown('breach', row.id, row)} />;
   }
   return null;
+}
+
+function BackButton({ onBack }: { onBack?: () => void }) {
+  if (!onBack) return null;
+  return (
+    <button
+      onClick={onBack}
+      className="p-1 hover:bg-accent rounded flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+      title="Back to previous drilldown"
+    >
+      <ArrowLeft className="h-3.5 w-3.5" /> Back
+    </button>
+  );
 }
 
 function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
