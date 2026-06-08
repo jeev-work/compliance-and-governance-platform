@@ -44,8 +44,12 @@ export function ComplianceView() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-end gap-2">
-        <span className="text-[10px] text-muted-foreground italic mr-auto">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <Lock className="h-4 w-4 text-primary" />
+          Compliance Auditor / System Analyst
+        </h2>
+        <span className="text-[10px] text-muted-foreground italic">
           Exports stamp every entry with the SLA config snapshot active at incident time — never the current config.
         </span>
       </div>

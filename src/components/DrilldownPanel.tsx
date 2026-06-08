@@ -1,15 +1,16 @@
 import { useFilters } from '@/lib/filterContext';
-import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone, ASSIGNEES } from '@/lib/mockData';
-import { exportMicroLedger } from '@/lib/exportLedger';
+import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone, ASSIGNEES, IMPACT_LABEL } from '@/lib/mockData';
+import { exportMicroLedger, exportKpiRowsCsv } from '@/lib/exportLedger';
 import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer, Phone, ArrowLeft,
+  Flag, Wrench, GitFork, Send, Lock, Timer, Phone, ArrowLeft, Download, Activity, Search,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
+import { CommentBoxWithMedia, AttachmentThumbs, CommentSubmission } from '@/components/CommentBoxWithMedia';
 
 /** Inline contact phone badge — shown next to any displayed person name. */
 function ContactPhone({ name }: { name: string | null | undefined }) {
@@ -41,12 +42,26 @@ const ASSIGNEE_POOL = [
   { name: 'P. Novak',    role: 'CTO' },
 ];
 
-function newLedgerEntry(action: string, actor: string, details?: string): LedgerEntry {
+function newLedgerEntry(action: string, actor: string, details?: string, attachments?: string[]): LedgerEntry {
   const hex = 'abcdef0123456789';
   let h = '';
   for (let i = 0; i < 16; i++) h += hex[Math.floor(Math.random() * 16)];
-  return { timestamp: new Date().toISOString(), actor, action, hash: `LDG-${h}`, details };
+  return { timestamp: new Date().toISOString(), actor, action, hash: `LDG-${h}`, details, attachments };
 }
+
+/** "3m ago" / "2h ago" / "Mon 14:32" — friendly relative timestamp. */
+function relTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleString();
+}
+
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green rag-green',
@@ -60,16 +75,18 @@ const RAG_BG: Record<RagState, string> = {
 export function DrilldownPanel() {
   const { drilldown, closeDrilldown, filteredData, openDrilldown, drilldownStack, popDrilldown } = useFilters();
   if (!drilldown.type) return null;
-  const canGoBack = drilldownStack.length > 0;
+  // Back always goes one step back — if stack is empty, it closes (instead of disappearing).
+  const goBack = drilldownStack.length > 0 ? popDrilldown : closeDrilldown;
+  const backLabel = drilldownStack.length > 0 ? 'Back to previous drilldown' : 'Close';
 
   if (drilldown.type === 'breach' && drilldown.row) {
-    return <BreachDetail row={drilldown.row} onClose={closeDrilldown} onBack={canGoBack ? popDrilldown : undefined} />;
+    return <BreachDetail row={drilldown.row} onClose={closeDrilldown} onBack={goBack} backLabel={backLabel} />;
   }
   if (drilldown.type === 'matrixCell' && drilldown.value) {
     const [sys, proc] = drilldown.value.split('||');
     const rows = filteredData.filter(r => r.system === sys && r.process === proc);
     return <MatrixCellDrilldown system={sys} process={proc} rows={rows} onClose={closeDrilldown}
-      onBack={canGoBack ? popDrilldown : undefined}
+      onBack={goBack} backLabel={backLabel}
       onSelect={(row) => openDrilldown('breach', row.id, row)} />;
   }
   if (drilldown.type === 'system' || drilldown.type === 'process' || drilldown.type === 'lob') {
@@ -77,27 +94,39 @@ export function DrilldownPanel() {
     const v = drilldown.value!;
     const rows = filteredData.filter(r => r[k] === v);
     return <GroupDrilldown type={k} value={v} rows={rows} onClose={closeDrilldown}
-      onBack={canGoBack ? popDrilldown : undefined}
+      onBack={goBack} backLabel={backLabel}
       onSelectBreach={(row) => openDrilldown('breach', row.id, row)} />;
   }
   return null;
 }
 
-function BackButton({ onBack }: { onBack?: () => void }) {
-  if (!onBack) return null;
+function BackButton({ onBack, label = 'Back' }: { onBack: () => void; label?: string }) {
   return (
     <button
       onClick={onBack}
       className="p-1 hover:bg-accent rounded flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
-      title="Back to previous drilldown"
+      title={label}
     >
       <ArrowLeft className="h-3.5 w-3.5" /> Back
     </button>
   );
 }
 
-function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect }: {
-  system: string; process: string; rows: KPIRow[]; onClose: () => void; onBack?: () => void; onSelect: (r: KPIRow) => void;
+/** Compact bottom-left footer Export button used by every drilldown modal. */
+function FooterExport({ onClick, label = 'Export' }: { onClick: () => void; label?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="text-[11px] font-semibold px-2.5 py-1 rounded border bg-primary/15 border-primary/40 text-primary hover:bg-primary/25 flex items-center gap-1"
+      title="Export as CSV"
+    >
+      <Download className="h-3 w-3" /> {label}
+    </button>
+  );
+}
+
+function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel, onSelect }: {
+  system: string; process: string; rows: KPIRow[]; onClose: () => void; onBack: () => void; backLabel?: string; onSelect: (r: KPIRow) => void;
 }) {
   const counts = rows.reduce((m, r) => { m[r.ragState] = (m[r.ragState] ?? 0) + 1; return m; }, {} as Record<RagState, number>);
   const sorted = [...rows].sort((a, b) => {
@@ -109,7 +138,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect 
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <BackButton onBack={onBack} />
+            <BackButton onBack={onBack} label={backLabel} />
             <Shield className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-sm font-semibold">{system} × {process}</h2>
@@ -157,23 +186,37 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, onSelect 
           })}
           {sorted.length === 0 && <div className="text-[10px] text-muted-foreground italic text-center py-4">No KPIs in this intersection for the current filter scope.</div>}
         </div>
+        <div className="px-4 py-2 border-t border-border bg-accent/10 rounded-b-lg flex items-center gap-2">
+          <FooterExport onClick={() => { exportKpiRowsCsv(rows, `cell-${system}-${process}`); toast.success(`Exported ${rows.length} rows`); }} />
+        </div>
       </div>
     </div>
   );
 }
 
-function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => void; onBack?: () => void }) {
-  const { filters, mutateRow, configSnapshots } = useFilters();
+function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClose: () => void; onBack: () => void; backLabel?: string }) {
+  const { filters, mutateRow, configSnapshots, registries } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
   // Dependency toggle modal state
-  const [depModal, setDepModal] = useState<null | { mode: 'enable' | 'disable'; team: string; reason: string; step: 'form' | 'confirm' }>(null);
+  const [depModal, setDepModal] = useState<null | {
+    mode: 'enable' | 'disable'; team: string; system: string; lob: string;
+    comment: string; attachments: string[]; step: 'form' | 'confirm';
+  }>(null);
 
   // Executive Flag + Reassign modal state
   const [execModal, setExecModal] = useState<null | { assignee: string; reason: string; step: 'form' | 'confirm' }>(null);
 
-  // Standard Reassign modal state (non-executive)
-  const [reassignModal, setReassignModal] = useState<null | { assignee: string; reason: string }>(null);
+  // Standard Reassign modal state (non-executive) — now with search + filters
+  const [reassignModal, setReassignModal] = useState<null | {
+    assignee: string; reason: string;
+    query: string; lobFilter: string; deptFilter: string; designationFilter: string;
+  }>(null);
+
+  // Resolve confirmation modal — captures a comment + media before closing.
+  const [resolveModal, setResolveModal] = useState<null | {
+    mode: 'standard' | 'cascade'; comment: string; attachments: string[];
+  }>(null);
 
   // Tick every 30s so the countdown re-renders without a full data refresh
   const [, setNow] = useState(0);
@@ -211,7 +254,8 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
   const verifyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (verifyTimer.current) clearTimeout(verifyTimer.current); }, []);
 
-  const onDeploy = () => {
+  /** Standard resolve flow — runs after the Resolve comment box is submitted. */
+  const runDeploy = (note: string, attachments: string[]) => {
     const now = new Date().toISOString();
     mutateRow(row.id, {
       resolutionStatus: 'Verifying',
@@ -220,7 +264,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
         { step: 'Resolved', timestamp: now, actor: 'You' },
         { step: 'Verifying', timestamp: now, actor: 'System' },
       ],
-      ledgerEntries: appendLedger(newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification')),
+      ledgerEntries: appendLedger(newLedgerEntry('Resolution Deployed', 'SPOC · You', note || 'Awaiting telemetry verification', attachments)),
     });
     toast.success(`Deploy Resolution sent — verifying telemetry (3s)…`);
 
@@ -243,7 +287,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
         ],
         ledgerEntries: [
           ...row.ledgerEntries,
-          newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Awaiting telemetry verification'),
+          newLedgerEntry('Resolution Deployed', 'SPOC · You', note || 'Awaiting telemetry verification', attachments),
           newLedgerEntry('Ticket Closed', 'System · Telemetry', 'RAG returned to GREEN'),
         ],
       });
@@ -251,19 +295,40 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
     }, 3000);
   };
 
-  const openEnableDep  = () => setDepModal({ mode: 'enable',  team: DEPENDENCY_TEAMS[0], reason: '', step: 'form' });
-  const openDisableDep = () => setDepModal({ mode: 'disable', team: row.dependency?.team ?? '', reason: '', step: 'confirm' });
+  const openEnableDep  = () => setDepModal({
+    mode: 'enable',
+    team: DEPENDENCY_TEAMS[0],
+    system: row.system,
+    lob: row.lob,
+    comment: '',
+    attachments: [],
+    step: 'form',
+  });
+  const openDisableDep = () => setDepModal({
+    mode: 'disable',
+    team: row.dependency?.team ?? '',
+    system: row.system,
+    lob: row.lob,
+    comment: '',
+    attachments: [],
+    step: 'confirm',
+  });
 
-  const commitEnableDep = (team: string, reason: string) => {
+  const commitEnableDep = (d: { team: string; system: string; lob: string; comment: string; attachments: string[] }) => {
     const ts = new Date().toISOString();
+    const routing = `${d.team} · ${d.system} · LoB ${d.lob}`;
     mutateRow(row.id, {
-      dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open', resolvedAt: null, resolvedBy: null, cascadeDismissed: false },
+      dependency: { team: d.team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open', resolvedAt: null, resolvedBy: null, cascadeDismissed: false },
       stateFlags: [...row.stateFlags.filter(f => f !== 'Cross-Functional'), 'Cross-Functional'],
-      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${team}` }],
-      ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency ENABLED', 'SPOC · You', `Notified ${team}${reason ? ` · ${reason}` : ''} · primary SLA timer paused`)),
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${d.team}` }],
+      ledgerEntries: appendLedger(newLedgerEntry(
+        'Multi-Team Dependency ENABLED', 'SPOC · You',
+        `Routed to ${routing}${d.comment ? ` · ${d.comment}` : ''} · primary SLA timer paused`,
+        d.attachments,
+      )),
     });
     setDepModal(null);
-    toast.success(`Multi-team dependency ENABLED → ${team} notified · ledgered`);
+    toast.success(`Multi-team dependency ENABLED → ${d.team} notified · ledgered`);
   };
   const commitDisableDep = () => {
     const ts = new Date().toISOString();
@@ -306,6 +371,10 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
   const openReassignModal = () => setReassignModal({
     assignee: ASSIGNEES.find(a => a.name !== row.assignee?.name)?.name ?? ASSIGNEES[0].name,
     reason: '',
+    query: '',
+    lobFilter: row.lob,
+    deptFilter: row.system,
+    designationFilter: '',
   });
   const commitReassign = (assigneeName: string, note: string) => {
     const next = ASSIGNEES.find(a => a.name === assigneeName) ?? ASSIGNEES[0];
@@ -345,7 +414,8 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
     && row.resolutionStatus !== 'Resolved'
     && row.status !== 'CLEAN';
 
-  const onCascadeClose = () => {
+  /** Cascade close — runs after user submits resolve comment box (cascade mode). */
+  const runCascadeClose = (note: string, attachments: string[]) => {
     if (!row.dependency) return;
     const dep = row.dependency;
     const ts = new Date().toISOString();
@@ -360,13 +430,13 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
         ...row.ledgerEntries,
         newLedgerEntry('Parent closure suggested by cascade rule', 'SPOC · You',
           `Triggered by child resolution: ${dep.linkedId} (${dep.team})`),
-        newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Cascade close — awaiting telemetry verification'),
+        newLedgerEntry('Resolution Deployed', 'SPOC · You',
+          note || 'Cascade close — awaiting telemetry verification', attachments),
       ],
     });
     toast.success(`Cascade close accepted — verifying telemetry (3s)…`);
     if (verifyTimer.current) clearTimeout(verifyTimer.current);
     verifyTimer.current = setTimeout(() => {
-      const closedAt = new Date().toISOString();
       mutateRow(row.id, {
         resolutionStatus: 'Resolved',
         status: 'CLEAN',
@@ -380,7 +450,8 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
           ...row.ledgerEntries,
           newLedgerEntry('Parent closure suggested by cascade rule', 'SPOC · You',
             `Triggered by child resolution: ${dep.linkedId} (${dep.team})`),
-          newLedgerEntry('Resolution Deployed', 'SPOC · You', 'Cascade close — awaiting telemetry verification'),
+          newLedgerEntry('Resolution Deployed', 'SPOC · You',
+            note || 'Cascade close — awaiting telemetry verification', attachments),
           newLedgerEntry('Ticket Closed', 'System · Telemetry', 'Cascade closure verified — RAG returned to GREEN'),
         ],
       });
@@ -409,7 +480,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-3">
-            <BackButton onBack={onBack} />
+            <BackButton onBack={onBack} label={backLabel} />
             <AlertTriangle className={cn('h-5 w-5',
               row.severity === 'Critical' ? 'rag-red' : row.severity === 'High' ? 'rag-amber' : 'text-muted-foreground',
             )} />
@@ -430,9 +501,25 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
           <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
         </div>
 
-        {/* RAG strip + SLA Version */}
-        <div className="px-4 py-2 border-b border-border flex items-center gap-3 text-[10px]">
+        {/* RAG strip + SLA Version + Severity = Impact × Urgency */}
+        <div className="px-4 py-2 border-b border-border flex items-center gap-3 text-[10px] flex-wrap">
           <span className={cn('px-2 py-0.5 rounded font-bold', RAG_BG[row.ragState])}>{row.ragState}</span>
+          <span
+            className={cn(
+              'px-1.5 py-0.5 rounded font-mono font-bold border',
+              row.impactTier === 'T1' ? 'rag-red border-rag-red bg-rag-red'
+              : row.impactTier === 'T2' ? 'rag-amber border-rag-amber bg-rag-amber'
+              : row.impactTier === 'T3' ? 'text-chart-5 border-chart-5'
+              : 'text-muted-foreground border-border',
+            )}
+            title={IMPACT_LABEL[row.impactTier]}
+          >
+            Impact {row.impactTier}
+          </span>
+          <span className="text-muted-foreground" title="Dynamic: how close this breach is to going critical right now">
+            Urgency <span className="font-mono text-foreground">{row.urgencyScore}/4</span>
+          </span>
+          <span className="text-muted-foreground">Sev = Impact × Urgency = <span className="font-mono text-foreground">{row.severity}</span></span>
           <span className="text-muted-foreground">SLA: <span className="font-mono text-foreground">{row.slaVersion}</span></span>
           <span className="text-muted-foreground">Ledger: <span className="font-mono text-foreground">{row.auditLedgerId}</span></span>
           {row.maintenanceWindow && (
@@ -497,7 +584,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
                 className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
               >Dismiss</button>
               <button
-                onClick={onCascadeClose}
+                onClick={() => setResolveModal({ mode: 'cascade', comment: '', attachments: [] })}
                 className="text-[11px] px-2.5 py-1 rounded border border-rag-green bg-rag-green rag-green font-semibold hover:opacity-80 flex items-center gap-1"
               >
                 <CheckCircle2 className="h-3 w-3" /> Verify &amp; Close
@@ -532,8 +619,8 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
             icon={Timer}
             color={isClosed ? 'text-muted-foreground' : countdown.tone === 'red' ? 'rag-red' : countdown.tone === 'amber' ? 'rag-amber' : countdown.tone === 'green' ? 'rag-green' : 'text-muted-foreground'}
             label={isClosed ? 'Time to Escalate' : countdown.overdue ? 'Escalate · OVERDUE' : 'Time to Escalate'}
-            value={isClosed ? '—' : countdown.label}
-            caption={isClosed ? 'ticket closed' : undefined}
+            value={isClosed ? 'Not applicable' : countdown.label}
+            caption={isClosed ? 'ticket resolved' : undefined}
           />
           <TS icon={CheckCircle2} color="rag-green" label="Time to Resolve" value={fmtMinutes(row.timeToResolveMin)} />
           <TS
@@ -604,7 +691,36 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
           </div>
         )}
 
-        {/* Immutable Ledger */}
+        {/* Activity Log — human-friendly mirror of the immutable ledger */}
+        {row.ledgerEntries.length > 0 && (
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
+              <Activity className="h-3 w-3" /> Activity Log ({row.ledgerEntries.length})
+              <span className="ml-auto text-[9px] text-muted-foreground italic font-normal normal-case tracking-normal">Same data as the ledger below — no export required.</span>
+            </h3>
+            <div className="space-y-1.5 max-h-[200px] overflow-y-auto scrollbar-thin">
+              {[...row.ledgerEntries].reverse().map((l, i) => (
+                <div key={i} className="text-[11px] px-2.5 py-1.5 rounded bg-accent/20 border border-border/40">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn('inline-block h-1.5 w-1.5 rounded-full',
+                      /Closed|Resolution Deployed|Verifying/i.test(l.action) ? 'bg-rag-green' :
+                      /Escalated|EXECUTIVE|Reassigned/i.test(l.action) ? 'bg-rag-red' :
+                      /Acknowledged|Dependency|cascade/i.test(l.action) ? 'bg-rag-amber' :
+                      'bg-primary',
+                    )} />
+                    <span className="font-semibold text-foreground">{l.action}</span>
+                    <span className="text-muted-foreground">· {l.actor}</span>
+                    <span className="ml-auto font-mono text-[10px] text-muted-foreground">{relTime(l.timestamp)}</span>
+                  </div>
+                  {l.details && <div className="text-muted-foreground mt-0.5 pl-3.5">{l.details}</div>}
+                  <AttachmentThumbs urls={l.attachments} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Immutable Ledger (raw / WORM trail) */}
         {row.ledgerEntries.length > 0 && (
           <div className="px-4 py-3 border-b border-border">
             <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
@@ -620,6 +736,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
                     <span className="ml-auto text-muted-foreground">{l.hash}</span>
                   </div>
                   {l.details && <div className="text-muted-foreground mt-0.5 font-sans">{l.details}</div>}
+                  <AttachmentThumbs urls={l.attachments} />
                 </div>
               ))}
             </div>
@@ -629,6 +746,8 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
         {/* Role-gated actions */}
 
         <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center gap-2 flex-wrap rounded-b-lg">
+          <FooterExport onClick={onExport} />
+          <div className="w-px h-5 bg-border mx-1" />
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mr-1">Actions</span>
           {actions.includes('acknowledge') && (
             <ActionBtn
@@ -643,7 +762,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
             <ActionBtn
               icon={Wrench}
               label="Deploy Resolution"
-              onClick={onDeploy}
+              onClick={() => setResolveModal({ mode: 'standard', comment: '', attachments: [] })}
               variant="primary"
               disabled={row.status === 'CLEAN' || row.resolutionStatus === 'Verifying' || row.resolutionStatus === 'Resolved'}
               disabledLabel={row.resolutionStatus === 'Verifying' ? 'Verifying…' : 'Resolution Deployed'}
@@ -695,24 +814,46 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
 
             {depModal.mode === 'enable' && depModal.step === 'form' && (
               <div className="p-4 space-y-3">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Notify Team</label>
-                  <select
-                    value={depModal.team}
-                    onChange={(e) => setDepModal({ ...depModal, team: e.target.value })}
-                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
-                  >
-                    {DEPENDENCY_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Team</label>
+                    <select
+                      value={depModal.team}
+                      onChange={(e) => setDepModal({ ...depModal, team: e.target.value })}
+                      className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      {DEPENDENCY_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">System</label>
+                    <select
+                      value={depModal.system}
+                      onChange={(e) => setDepModal({ ...depModal, system: e.target.value })}
+                      className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      {registries.systems.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">LoB</label>
+                    <select
+                      value={depModal.lob}
+                      onChange={(e) => setDepModal({ ...depModal, lob: e.target.value })}
+                      className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      {registries.lobs.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reason (optional)</label>
-                  <input
-                    value={depModal.reason}
-                    onChange={(e) => setDepModal({ ...depModal, reason: e.target.value })}
-                    placeholder="e.g. upstream firewall rule blocking traffic"
-                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
-                  />
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Comment</label>
+                  <div className="mt-1">
+                    <CommentBoxWithMedia
+                      placeholder="Add a note"
+                      onChange={(s) => setDepModal({ ...depModal, comment: s.text, attachments: s.attachments })}
+                    />
+                  </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button onClick={() => setDepModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
@@ -747,7 +888,7 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
                     className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent"
                   >Cancel</button>
                   <button
-                    onClick={() => depModal.mode === 'enable' ? commitEnableDep(depModal.team, depModal.reason) : commitDisableDep()}
+                    onClick={() => depModal.mode === 'enable' ? commitEnableDep(depModal) : commitDisableDep()}
                     className={cn(
                       'text-[11px] px-3 py-1 rounded border font-semibold flex items-center gap-1',
                       depModal.mode === 'enable'
@@ -838,13 +979,33 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
         </div>
       )}
 
-      {/* Standard Reassign modal — dropdown of available people with phone numbers */}
+      {/* Standard Reassign modal — search box + LoB / Dept / Designation filters */}
       {reassignModal && (() => {
-        const selected = ASSIGNEES.find(a => a.name === reassignModal.assignee);
-        const pool = ASSIGNEES.filter(a => a.name !== row.assignee?.name);
+        const LOBS = ['B2B', 'B2C', 'Wheels'];
+        // Synthesize lob/dept/designation for each assignee from their role.
+        const enriched = ASSIGNEES.map((a, i) => {
+          const parts = a.role.split('·').map(s => s.trim());
+          const designation = parts[0] || a.role;
+          const dept = parts[1] ? parts[1].replace(/\s*SPOC$/i, '').trim() : 'Cross-system';
+          const lob = LOBS[i % LOBS.length];
+          return { ...a, designation, dept, lob };
+        });
+        const q = reassignModal.query.trim().toLowerCase();
+        const designationOptions = Array.from(new Set(enriched.map(e => e.designation))).sort();
+        const filtered = enriched.filter(e => {
+          if (e.name === row.assignee?.name) return false;
+          if (reassignModal.lobFilter && e.lob !== reassignModal.lobFilter) return false;
+          if (reassignModal.deptFilter && e.dept !== reassignModal.deptFilter) return false;
+          if (reassignModal.designationFilter && e.designation !== reassignModal.designationFilter) return false;
+          if (q) {
+            const hay = `${e.name} ${e.role} ${e.dept} ${e.lob} ${e.designation}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
         return (
           <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setReassignModal(null)}>
-            <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-card border border-border rounded-lg w-full max-w-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <User className="h-4 w-4 text-primary" /> Reassign Ticket
@@ -855,30 +1016,80 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
                 <div className="text-[10px] text-muted-foreground">
                   Current assignee: <span className="font-semibold text-foreground">{row.assignee?.name ?? 'Unassigned'}</span> <ContactPhone name={row.assignee?.name} />
                 </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reassign To</label>
-                  <select
-                    value={reassignModal.assignee}
-                    onChange={(e) => setReassignModal({ ...reassignModal, assignee: e.target.value })}
-                    className="mt-1 w-full h-8 text-xs bg-secondary border border-border rounded px-2"
-                  >
-                    {pool.map(a => (
-                      <option key={a.name} value={a.name}>{a.name} — {a.role} · {a.phone}</option>
-                    ))}
-                  </select>
-                  {selected && (
-                    <div className="mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <span>Contact before assigning:</span>
-                      <a
-                        href={`tel:${selected.phone.replace(/[^+\d]/g, '')}`}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary font-mono hover:bg-primary/20"
-                      >
-                        <Phone className="h-3 w-3" />{selected.phone}
-                      </a>
-                      <span className="text-muted-foreground">· {selected.role}</span>
-                    </div>
-                  )}
+
+                <div className="relative">
+                  <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <input
+                    value={reassignModal.query}
+                    onChange={(e) => setReassignModal({ ...reassignModal, query: e.target.value })}
+                    placeholder="Search by name, LoB, department, system, or designation…"
+                    className="w-full h-8 text-xs bg-secondary border border-border rounded pl-7 pr-2 focus:outline-none focus:border-primary/50"
+                  />
                 </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">LoB</label>
+                    <select
+                      value={reassignModal.lobFilter}
+                      onChange={(e) => setReassignModal({ ...reassignModal, lobFilter: e.target.value })}
+                      className="mt-1 w-full h-7 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      <option value="">All</option>
+                      {LOBS.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Department / System</label>
+                    <select
+                      value={reassignModal.deptFilter}
+                      onChange={(e) => setReassignModal({ ...reassignModal, deptFilter: e.target.value })}
+                      className="mt-1 w-full h-7 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      <option value="">All</option>
+                      {Array.from(new Set(enriched.map(e => e.dept))).sort().map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Designation</label>
+                    <select
+                      value={reassignModal.designationFilter}
+                      onChange={(e) => setReassignModal({ ...reassignModal, designationFilter: e.target.value })}
+                      className="mt-1 w-full h-7 text-xs bg-secondary border border-border rounded px-2"
+                    >
+                      <option value="">All</option>
+                      {designationOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="max-h-[220px] overflow-y-auto scrollbar-thin border border-border/60 rounded">
+                  {filtered.length === 0 && (
+                    <div className="text-[10px] text-muted-foreground italic text-center py-4">No candidates match these filters.</div>
+                  )}
+                  {filtered.map(c => {
+                    const active = reassignModal.assignee === c.name;
+                    return (
+                      <button
+                        key={c.name}
+                        onClick={() => setReassignModal({ ...reassignModal, assignee: c.name })}
+                        className={cn(
+                          'w-full text-left px-2.5 py-1.5 text-[11px] border-b border-border/40 hover:bg-accent/40',
+                          active && 'bg-primary/10',
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground">{c.name}</span>
+                          <span className="text-[9px] font-mono px-1 rounded bg-secondary border border-border text-muted-foreground">{c.lob}</span>
+                          <span className="text-[9px] font-mono px-1 rounded bg-secondary border border-border text-muted-foreground">{c.dept}</span>
+                          <span className="ml-auto font-mono text-[10px] text-muted-foreground">{c.phone}</span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{c.designation}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div>
                   <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Handover note (optional)</label>
                   <input
@@ -902,6 +1113,54 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
           </div>
         );
       })()}
+
+      {/* Resolve confirmation modal — captures a comment + media before closing the ticket. */}
+      {resolveModal && (
+        <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setResolveModal(null)}>
+          <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 rag-green" />
+                {resolveModal.mode === 'cascade' ? 'Verify & Close (cascade)' : 'Confirm Resolution'}
+              </h3>
+              <button onClick={() => setResolveModal(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">What was resolved? *</label>
+                <div className="mt-1">
+                  <CommentBoxWithMedia
+                    placeholder="Describe the fix, root cause, and any verification done"
+                    required
+                    rows={4}
+                    onChange={(s: CommentSubmission) => setResolveModal({ ...resolveModal, comment: s.text, attachments: s.attachments })}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button onClick={() => setResolveModal(null)} className="text-[11px] px-3 py-1 rounded border bg-secondary border-border hover:bg-accent">Cancel</button>
+                <button
+                  disabled={!resolveModal.comment.trim()}
+                  onClick={() => {
+                    const m = resolveModal;
+                    setResolveModal(null);
+                    if (m.mode === 'cascade') runCascadeClose(m.comment, m.attachments);
+                    else runDeploy(m.comment, m.attachments);
+                  }}
+                  className={cn(
+                    'text-[11px] px-3 py-1 rounded border font-semibold flex items-center gap-1',
+                    resolveModal.comment.trim()
+                      ? 'bg-rag-green border-rag-green rag-green hover:opacity-80'
+                      : 'bg-secondary border-border text-muted-foreground opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  <CheckCircle2 className="h-3 w-3" /> Confirm Resolve
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -941,8 +1200,8 @@ function TS({ icon: Icon, color, label, value, caption }: { icon: any; color: st
   );
 }
 
-function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: {
-  type: 'system' | 'process' | 'lob'; value: string; rows: any[]; onClose: () => void; onBack?: () => void; onSelectBreach: (row: KPIRow) => void;
+function GroupDrilldown({ type, value, rows, onClose, onBack, backLabel, onSelectBreach }: {
+  type: 'system' | 'process' | 'lob'; value: string; rows: any[]; onClose: () => void; onBack: () => void; backLabel?: string; onSelectBreach: (row: KPIRow) => void;
 }) {
   const breached = rows.filter(r => r.status === 'BREACHED');
   const totalBreaches = rows.reduce((s, r) => s + r.breaches, 0);
@@ -961,7 +1220,7 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: 
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <BackButton onBack={onBack} />
+            <BackButton onBack={onBack} label={backLabel} />
             <Shield className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-sm font-semibold">{value}</h2>
@@ -1007,7 +1266,7 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: 
                 <span className="text-muted-foreground">{row.date}</span>
                 <span className={cn('font-semibold', row.severity === 'Critical' ? 'rag-red' : 'rag-amber')}>{row.severity}</span>
                 <span className="font-mono rag-red">{row.breaches} breaches</span>
-                {row.executiveFlag && <ShieldAlert className="h-3 w-3 rag-red" />}
+                {row.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {row.dependency?.status === 'resolved' && !row.dependency.cascadeDismissed && row.resolutionStatus !== 'Resolved' && (
                   <span className="text-[9px] px-1 py-0.5 rounded font-semibold bg-rag-green rag-green border border-rag-green">↩ child resolved</span>
                 )}
@@ -1017,6 +1276,9 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, onSelectBreach }: 
             ))}
             {breached.length > 50 && <div className="text-center text-[10px] text-muted-foreground py-1">+{breached.length - 50} more</div>}
           </div>
+        </div>
+        <div className="px-4 py-2 border-t border-border bg-accent/10 rounded-b-lg flex items-center gap-2">
+          <FooterExport onClick={() => { exportKpiRowsCsv(rows, `${type}-${value}`); toast.success(`Exported ${rows.length} rows`); }} />
         </div>
       </div>
     </div>

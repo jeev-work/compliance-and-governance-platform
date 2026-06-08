@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, ReactNode, useCallback, useEffect } from 'react';
-import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag, LedgerEntry, SlaVersionRecord } from './mockData';
+import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag, LedgerEntry, SlaVersionRecord, ImpactTier, getImpactTier } from './mockData';
 
 export type Role = 'executive' | 'lobManager' | 'spoc' | 'compliance' | 'analyst' | 'admin';
 
@@ -16,6 +16,7 @@ export type FilterState = {
   stateFlags: StateFlag[];
   ragStates: RagState[];
   severities: Severity[];
+  impacts: ImpactTier[];
   searchQuery: string;
 };
 
@@ -126,6 +127,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     stateFlags: [],
     ragStates: [],
     severities: [],
+    impacts: [],
     searchQuery: '',
   });
   const [drilldown, setDrilldown] = useState<DrilldownState>({ type: null, value: null, row: null });
@@ -287,7 +289,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       executiveFlag: false, executiveFlagSetAt: null, auditLedgerId: fakeHash('LDG'),
       maintenanceWindow: null,
       timeToDetectMin: null, timeToEscalateMin: null, timeToResolveMin: null,
-      resolvedBy: null, severity: input.severity, riskScore: 0,
+      resolvedBy: null, severity: input.severity, impactTier: getImpactTier(input.lob, input.system), urgencyScore: 1, riskScore: 0,
       ledgerEntries: ledger,
     };
     setAllData(prev => [row, ...prev]);
@@ -327,6 +329,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       if (filters.processes.length && !filters.processes.includes(row.process)) return false;
       if (filters.ragStates.length && !filters.ragStates.includes(row.ragState)) return false;
       if (filters.severities.length && (row.status !== 'BREACHED' || !filters.severities.includes(row.severity))) return false;
+      if (filters.impacts.length && !filters.impacts.includes(row.impactTier)) return false;
       if (filters.stateFlags.length && !filters.stateFlags.some(f => row.stateFlags.includes(f))) return false;
       if (q) {
         const hay = `${row.id} ${row.system} ${row.process} ${row.lob} ${row.assignee?.name ?? ''} ${row.auditLedgerId} ${row.resolutionStatus}`.toLowerCase();

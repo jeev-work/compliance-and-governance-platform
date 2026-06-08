@@ -58,6 +58,47 @@ export type StateFlag =
   | 'Cross-Functional' | 'Verifying' | 'Unconfigured';
 
 export type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
+export type ImpactTier = 'T1' | 'T2' | 'T3' | 'T4';
+export type UrgencyScore = 1 | 2 | 3 | 4;
+
+/** Human label for each impact tier — surfaced in the drilldown header. */
+export const IMPACT_LABEL: Record<ImpactTier, string> = {
+  T1: 'Tier 1 · Customer-facing critical',
+  T2: 'Tier 2 · Customer-facing standard',
+  T3: 'Tier 3 · Internal operations',
+  T4: 'Tier 4 · Reporting / back-office',
+};
+
+/** Hard-coded business-impact tier per (LoB, system) — set at KPI creation, never changes. */
+export function getImpactTier(lob: string, system: string): ImpactTier {
+  if (system === 'Payment Gateway' || system === 'Auth Engine') return 'T1';
+  if (system === 'Core Banking')   return lob === 'B2C' ? 'T1' : 'T2';
+  if (system === 'CRM')            return 'T3';
+  if (system === 'Document Cloud') return 'T3';
+  if (system === 'Data Warehouse') return 'T4';
+  return 'T3';
+}
+
+/** Dynamic urgency 1-4 from current RAG + risk score (how close to going critical right now). */
+export function getUrgency(rag: RagState, riskScore: number): UrgencyScore {
+  if (rag === 'RED')   return riskScore >= 80 ? 4 : riskScore >= 60 ? 3 : 2;
+  if (rag === 'AMBER') return riskScore >= 40 ? 3 : 2;
+  if (rag === 'GREY')  return 2;
+  if (rag === 'BLUE')  return 1;
+  return 1;
+}
+
+/** Severity = Impact × Urgency matrix (industry-standard ITIL/PagerDuty pattern). */
+const SEV_MATRIX: Severity[][] = [
+  ['Medium', 'High',   'Critical', 'Critical'], // T1
+  ['Medium', 'Medium', 'High',     'Critical'], // T2
+  ['Low',    'Medium', 'Medium',   'High'],     // T3
+  ['Low',    'Low',    'Low',      'Medium'],   // T4
+];
+export function sevMatrix(t: ImpactTier, u: UrgencyScore): Severity {
+  const ti = { T1: 0, T2: 1, T3: 2, T4: 3 }[t];
+  return SEV_MATRIX[ti][u - 1];
+}
 
 export type ChaseStep =
   | 'Generated' | 'Notified' | 'Acknowledged' | 'Resolved' | 'Verifying' | 'Closed';
@@ -74,7 +115,14 @@ export type DependencyFork = {
   resolvedBy: string | null;        // on-call actor on the child team
   cascadeDismissed: boolean;        // SPOC explicitly dismissed the auto-suggest banner
 };
-export type LedgerEntry = { timestamp: string; actor: string; action: string; hash: string; details?: string };
+export type LedgerEntry = {
+  timestamp: string;
+  actor: string;
+  action: string;
+  hash: string;
+  details?: string;
+  attachments?: string[];           // data-URL screenshots attached via comment box
+};
 
 /** Per-KPI SLA version history — each KPI carries its own threshold trail. */
 export type SlaVersionRecord = {
@@ -119,6 +167,8 @@ export type KPIRow = {
   timeToResolveMin: number | null;
   resolvedBy: string | null;
   severity: Severity;
+  impactTier: ImpactTier;       // static — set at KPI creation, never changes
+  urgencyScore: UrgencyScore;   // dynamic — recomputed from current RAG + risk
   riskScore: number;
   ledgerEntries: LedgerEntry[];
 };
@@ -295,13 +345,14 @@ export function generateMockData(count = 30000): KPIRow[] {
     const failureRate = breaches === 0 ? 0 : parseFloat(((breaches / baseVolume) * 100).toFixed(4));
     const status: KPIRow['status'] = ragState === 'RED' || ragState === 'AMBER' ? 'BREACHED' : 'CLEAN';
 
-    let severity: Severity = 'Low';
-    if (ragState === 'RED') severity = failureRate > 1 ? 'Critical' : failureRate > 0.5 ? 'High' : 'Medium';
-    else if (ragState === 'AMBER') severity = 'Medium';
-
     const riskScore = ragState === 'RED' ? Math.min(100, Math.round(40 + failureRate * 20))
                     : ragState === 'AMBER' ? Math.round(20 + failureRate * 10)
                     : ragState === 'GREY' ? 60 : 0;
+
+    // Severity = Impact × Urgency
+    const impactTier = getImpactTier(lob, system);
+    const urgencyScore = status === 'BREACHED' ? getUrgency(ragState, riskScore) : 1 as UrgencyScore;
+    const severity: Severity = sevMatrix(impactTier, urgencyScore);
 
     let resolutionStatus: KPIRow['resolutionStatus'] = 'Clean';
     let assignee: KPIRow['assignee'] = null;
@@ -480,6 +531,8 @@ export function generateMockData(count = 30000): KPIRow[] {
       timeToResolveMin,
       resolvedBy,
       severity,
+      impactTier,
+      urgencyScore,
       riskScore,
       ledgerEntries: makeLedgerFromChase(rand, chaseTimeline, ragState, severity, assignee?.name ?? 'Unassigned', !!dependency, !!executiveFlag),
     });

@@ -11,6 +11,16 @@ import { toast } from 'sonner';
 
 type AuthoringMode = null | 'kpi' | 'lob' | 'system';
 
+const CONNECTOR_INCIDENTS: { title: string; detail: string; timeAgo: string; action: string; severity: 'high' | 'medium' | 'low' }[] = [
+  { title: 'Schema drift detected', detail: 'payments_v2.metric_alerts — 3 new columns ignored by ingest mapper', timeAgo: '12m ago', action: 'Update mapper schema', severity: 'medium' },
+  { title: 'Auth token rotated upstream', detail: 'AppDynamics service account — last successful poll 18m ago', timeAgo: '18m ago', action: 'Re-issue API token', severity: 'high' },
+  { title: 'Rate limit (HTTP 429)', detail: 'Metrics API backing off · 6 retries scheduled', timeAgo: '4m ago', action: 'Throttle ingest interval', severity: 'medium' },
+  { title: 'Webhook signature mismatch', detail: 'Incident provider — 14 events rejected as untrusted', timeAgo: '27m ago', action: 'Rotate shared secret', severity: 'high' },
+  { title: 'Stale heartbeat', detail: 'ServiceNow connector idle 42m (threshold 15m)', timeAgo: '42m ago', action: 'Restart connector pod', severity: 'high' },
+  { title: 'Connector outage cleared', detail: 'Payment Gateway · resumed after 6h grey-state window', timeAgo: '1h ago', action: 'Backfill missed window', severity: 'low' },
+  { title: 'DNS resolution flapping', detail: 'metrics.internal — 18% intermittent NXDOMAIN', timeAgo: '8m ago', action: 'Check resolver overrides', severity: 'medium' },
+];
+
 export function AdminHealthView() {
   const {
     filteredData, allData, registries, addLob, addSystem, addKpi,
@@ -102,28 +112,28 @@ export function AdminHealthView() {
         </div>
       </div>
 
-      {/* Health row */}
+      {/* Connector incidents — text-only, varied failure modes */}
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-card border border-border rounded-md p-3">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Database className="h-3 w-3" /> Connector Health
+            <Database className="h-3 w-3" /> Connector Incidents
           </h3>
-          <div className="space-y-1.5">
-            {connectors.map(c => (
-              <div key={c.source} className={cn(
-                'rounded border px-2 py-1.5 flex items-center gap-2',
-                c.health === 'GREEN' && 'bg-rag-green border-rag-green',
-                c.health === 'AMBER' && 'bg-rag-amber border-rag-amber',
-                c.health === 'RED'   && 'bg-rag-red border-rag-red',
-              )}>
-                {c.health === 'GREEN' ? <Wifi className="h-3.5 w-3.5 rag-green" /> : <WifiOff className={cn('h-3.5 w-3.5', c.health === 'AMBER' ? 'rag-amber' : 'rag-red')} />}
-                <div className="flex-1">
-                  <div className="text-xs font-semibold">{c.source}</div>
-                  <div className="text-[9px] text-muted-foreground">{c.total.toLocaleString()} KPIs · {c.grey} data-starved</div>
+          <div className="space-y-1.5 max-h-[220px] overflow-y-auto scrollbar-thin">
+            {CONNECTOR_INCIDENTS.map((inc, i) => (
+              <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded border border-border/60 bg-secondary/30">
+                <span className={cn(
+                  'mt-1 inline-block h-1.5 w-1.5 rounded-full shrink-0',
+                  inc.severity === 'high'   && 'bg-rag-red',
+                  inc.severity === 'medium' && 'bg-rag-amber',
+                  inc.severity === 'low'    && 'bg-muted-foreground',
+                )} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] font-semibold text-foreground">{inc.title}</div>
+                  <div className="text-[10px] text-muted-foreground">{inc.detail}</div>
+                  <div className="text-[9px] text-muted-foreground mt-0.5 font-mono">
+                    {inc.timeAgo} · Recommended: <span className="text-foreground/80">{inc.action}</span>
+                  </div>
                 </div>
-                <div className={cn('text-[10px] font-mono font-bold',
-                  c.health === 'GREEN' ? 'rag-green' : c.health === 'AMBER' ? 'rag-amber' : 'rag-red',
-                )}>{c.health}</div>
               </div>
             ))}
           </div>
