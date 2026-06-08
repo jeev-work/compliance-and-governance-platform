@@ -33,26 +33,52 @@ export function exportMasterLedger(master: LedgerEntry[], snapshots: ConfigSnaps
   download(`master-ledger-${Date.now()}.json`, JSON.stringify(payload, null, 2));
 }
 
+/* -------- CSV helpers -------- */
+function csvCell(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+function csvRow(cells: unknown[]): string {
+  return cells.map(csvCell).join(',');
+}
+
 export function exportMicroLedger(
   scope: { kind: 'kpi' | 'lob' | 'system'; name: string },
   entries: LedgerEntry[],
   snapshots: ConfigSnapshot[],
   context?: Partial<KPIRow>,
 ) {
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    scope,
-    integrityNote:
-      'Snapshot-bound export — thresholds inlined per entry. Replays use the snapshot active at incident time, ' +
-      'so this file is safe to share with regulators without risk of mis-evaluation under newer SLA rules.',
-    contextSummary: context ? {
-      currentSlaVersion: context.slaVersion ?? null,
-      currentSlaHistory: context.slaHistory ?? null,
-      currentRag: context.ragState ?? null,
-    } : null,
-    configSnapshots: snapshots,
-    ledger: stamp(entries, snapshots),
-  };
-  const file = `micro-ledger-${scope.kind}-${scope.name.replace(/[^a-z0-9]+/gi, '_')}-${Date.now()}.json`;
-  download(file, JSON.stringify(payload, null, 2));
+  const stamped = stamp(entries, snapshots);
+  const header = [
+    'timestamp', 'actor', 'action', 'details', 'hash',
+    'scope_kind', 'scope_name',
+    'kpi_id', 'lob', 'system', 'process',
+    'config_snapshot_id_at_event', 'config_rules_at_event',
+    'current_sla_version', 'current_rag', 'current_resolution_status',
+  ];
+  const rows: string[] = [csvRow(header)];
+  if (stamped.length === 0) {
+    rows.push(csvRow([
+      '', '', '(no ledger entries)', '', '',
+      scope.kind, scope.name,
+      context?.id ?? '', context?.lob ?? '', context?.system ?? '', context?.process ?? '',
+      '', '',
+      context?.slaVersion ?? '', context?.ragState ?? '', context?.resolutionStatus ?? '',
+    ]));
+  } else {
+    for (const e of stamped) {
+      rows.push(csvRow([
+        e.timestamp, e.actor, e.action, e.details ?? '', e.hash,
+        scope.kind, scope.name,
+        context?.id ?? '', context?.lob ?? '', context?.system ?? '', context?.process ?? '',
+        e.configSnapshotId ?? '', e.configRules ?? '',
+        context?.slaVersion ?? '', context?.ragState ?? '', context?.resolutionStatus ?? '',
+      ]));
+    }
+  }
+  const csv = rows.join('\r\n') + '\r\n';
+  const file = `micro-ledger-${scope.kind}-${scope.name.replace(/[^a-z0-9]+/gi, '_')}-${Date.now()}.csv`;
+  download(file, csv, 'text/csv;charset=utf-8');
 }

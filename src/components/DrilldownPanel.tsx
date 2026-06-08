@@ -1,5 +1,6 @@
 import { useFilters } from '@/lib/filterContext';
 import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone, ASSIGNEES } from '@/lib/mockData';
+import { exportMicroLedger } from '@/lib/exportLedger';
 import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
@@ -121,7 +122,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
                 <span className="font-mono font-semibold text-foreground">{r.id}</span>
                 <span className="text-muted-foreground">{r.lob}</span>
                 <span className={cn('font-bold font-mono px-1 rounded', RAG_BG[r.ragState])}>{r.ragState}</span>
-                {r.status === 'BREACHED' && <span className="font-mono rag-red">{r.breaches} br</span>}
+                {r.status === 'BREACHED' && <span className="font-mono rag-red">{r.breaches} breaches</span>}
                 {r.executiveFlag && <Flag className="h-3 w-3 rag-red" />}
                 {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
                 <span className="ml-auto text-muted-foreground">{r.resolutionStatus}</span>
@@ -142,7 +143,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onSelect }: {
 }
 
 function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
-  const { filters, mutateRow } = useFilters();
+  const { filters, mutateRow, configSnapshots } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
   // Dependency toggle modal state
@@ -293,7 +294,10 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
     });
     toast.success(`Escalated to HOD`);
   };
-  const onExport = () => toast.success(`Regulatory audit exported · hash: ${row.auditLedgerId}`);
+  const onExport = () => {
+    exportMicroLedger({ kind: 'kpi', name: row.id }, row.ledgerEntries, configSnapshots, row);
+    toast.success(`Audit exported · hash: ${row.auditLedgerId}`);
+  };
 
 
   return (
@@ -536,7 +540,7 @@ function BreachDetail({ row, onClose }: { row: KPIRow; onClose: () => void }) {
             <ActionBtn icon={Flag} label={row.executiveFlag ? 'Reassign (Exec)' : 'Executive Flag'} onClick={openExecModal} variant="danger" />
           )}
           {actions.includes('exportAudit') && (
-            <ActionBtn icon={FileDown} label="Export Regulatory Audit" onClick={onExport} variant="primary" />
+            <ActionBtn icon={FileDown} label="Export" onClick={onExport} variant="primary" />
           )}
           {actions.length === 0 && (
             <span className="text-[10px] text-muted-foreground italic">Read-only role · no actions available</span>

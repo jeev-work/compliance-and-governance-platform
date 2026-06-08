@@ -68,7 +68,7 @@ export function AdminHealthView() {
           </button>
           <button onClick={() => { exportMasterLedger(masterLedger, configSnapshots); toast.success('Master ledger exported · snapshot-stamped'); }}
             className="text-[10px] font-semibold px-2 py-1 rounded border bg-rag-amber border-rag-amber rag-amber hover:opacity-80 flex items-center gap-1">
-            <Download className="h-3 w-3" /> Master Ledger
+            <Download className="h-3 w-3" /> Export
           </button>
         </div>
       </div>
@@ -210,7 +210,7 @@ export function AdminHealthView() {
                     }}
                     className="ml-auto text-[10px] font-semibold px-2 py-1 rounded border bg-primary/15 border-primary/40 text-primary hover:bg-primary/25 flex items-center gap-1"
                   >
-                    <Download className="h-3 w-3" /> Export Micro Ledger
+                    <Download className="h-3 w-3" /> Export
                   </button>
                 </div>
                 <table className="w-full text-[10px]">

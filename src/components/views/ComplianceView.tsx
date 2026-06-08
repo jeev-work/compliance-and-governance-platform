@@ -52,7 +52,7 @@ export function ComplianceView() {
           onClick={() => { exportMasterLedger(masterLedger, configSnapshots); toast.success('Master ledger exported · snapshot-stamped'); }}
           className="text-[10px] font-semibold px-2 py-1 rounded border bg-rag-amber border-rag-amber rag-amber hover:opacity-80 flex items-center gap-1"
         >
-          <FileDown className="h-3 w-3" /> Export Master Ledger
+          <FileDown className="h-3 w-3" /> Export
         </button>
       </div>
       {/* KPI tiles */}
@@ -149,7 +149,7 @@ export function ComplianceView() {
                     </div>
                     <div className="text-muted-foreground mt-0.5">{row.process} · {row.lob}</div>
                     <div className="flex items-center justify-between mt-0.5">
-                      <span className={cn('font-mono', `rag-${col.color}`)}>{row.breaches} br</span>
+                      <span className={cn('font-mono', `rag-${col.color}`)}>{row.breaches} breaches</span>
                       {row.assignee && <span className="text-muted-foreground">{row.assignee.name}{getContactPhone(row.assignee.name) && <span className="ml-1 font-mono">· {getContactPhone(row.assignee.name)}</span>}</span>}
                     </div>
                   </div>

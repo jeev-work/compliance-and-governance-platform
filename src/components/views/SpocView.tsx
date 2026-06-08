@@ -82,7 +82,7 @@ export function SpocView() {
                 <span className={cn('font-semibold', sev(r.severity))}>{r.severity}</span>
                 {r.dependency && <GitFork className="h-3 w-3 text-chart-5" />}
                 {r.executiveFlag && <ShieldAlert className="h-3 w-3 rag-red" />}
-                <span className="ml-auto rag-red font-mono">{r.breaches} br</span>
+                <span className="ml-auto rag-red font-mono">{r.breaches} breaches</span>
                 <Wrench className="h-3 w-3 text-primary" />
               </div>
             ))}
