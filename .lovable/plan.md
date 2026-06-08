@@ -1,97 +1,151 @@
+# Plan: Severity model, drilldown polish, and platform-wide UX fixes
 
-# Dependency cascade — auto-suggest close (Option 2)
+Batch of ~13 changes across the dashboard. Grouped by area; each item maps to specific files.
 
-When a child sub-ticket resolves, post a ledger note on the parent and surface a one-click "Verify & close parent?" banner. Human stays in the loop; the link is impossible to miss.
+---
 
-## 1. Data model (`src/lib/mockData.ts`)
+## 1. Severity model — answer & implementation
 
-Extend `DependencyFork` so the parent knows the child resolved and when:
+**Your question:** does severity come from KPI importance, or from predicted likelihood of breach?
 
-```text
-DependencyFork {
-  team, timestamp, linkedId,
-  status: 'open' | 'resolved',
-  resolvedAt: string | null     // NEW — ISO ts when child closed
-  resolvedBy: string | null     // NEW — actor on the child side
-}
-```
+**Answer: both, on two separate axes.** Collapsing them into one number is what causes the confusion. Industry standard (ITIL / ServiceNow / PagerDuty) splits them:
 
-In `generateMockData`, the existing ~50/50 `open|resolved` split for seeded dependencies stays; when `status === 'resolved'` we now also seed `resolvedAt = ts + 1–4h` and `resolvedBy = pick(DEPENDENCY_TEAMS) + ' on-call'`.
+- **Impact (static, set at KPI creation):** how much it hurts the business if this KPI breaches. Driven by the KPI's role — e.g. "UPI auth success rate" = Tier-1, "internal report freshness" = Tier-4. Set once by Admin, lives on the KPI definition. Doesn't change tick to tick.
+- **Urgency (dynamic, computed live):** how close this specific breach is to going critical right now. Driven by failure-rate trend, time-since-detection, and the existing `riskScore`.
+- **Severity = Impact × Urgency** via a 4×4 matrix → Critical / High / Medium / Low. This is what you already display, but right now it's derived ad-hoc from `failureRate` only (`mockData.ts` L298-300).
 
-Seed a handful (3–5) of demo rows where:
-- parent KPI is still in `Investigating` / `Escalated to HOD`
-- `dependency.status === 'resolved'` with a recent `resolvedAt`
-- so the banner shows up immediately in the demo without any clicks.
+**Code changes:**
+- `KPIRow` gets `impactTier: 'T1' | 'T2' | 'T3' | 'T4'` and `urgencyScore: 1 | 2 | 3 | 4`.
+- `severity` becomes a pure function `sevMatrix(impact, urgency)` — no more inline ternary.
+- Drilldown header shows both chips: `Impact: T1 (Customer-facing payments)` and `Urgency: 3/4 ↑ trending`. Combined Severity badge stays as the headline.
+- **Impact tiers hardcoded per your decision:** Payments LoB → T1; Cards/Lending → T2; Operations/Risk → T3; Internal reporting/back-office → T4. Seeded deterministically in `generateMockData`.
 
-## 2. Simulated child-resolution sweep (`src/lib/filterContext.tsx`)
+**UI — new filter tab in the top bar:**
+- Add a **Severity** chip group to `GlobalFilterBar.tsx` (Critical / High / Medium / Low) alongside existing RAG and State chips. Filter logic already exists in `filterContext.tsx` L259 (`filters.severities`) — currently no UI. Wire it up.
+- Add a small **Impact** dropdown (T1–T4) next to it for "show me only Tier-1" auditor flows.
 
-Same pattern as the exec-flag expiry sweep: a 60s interval scans rows whose `dependency.status === 'open'`. With low probability per tick (~3%), flip a random open dependency to `resolved` with `resolvedAt = now`, `resolvedBy = '<team> on-call'`, and append a ledger entry:
+---
 
-> `"Linked child <SUB-id> resolved by <team>"` — actor: `System · Dependency Bridge`
+## 2. Export buttons — consolidate & relocate
 
-This makes the cascade visible during a live demo without anyone touching the other team's queue. Skips Resolved/Clean parents.
+- **Remove** the global Export pill from `GlobalFilterBar.tsx` (top-right).
+- Inside every drilldown modal (BreachDetail, MatrixCellDrilldown, GroupDrilldown), place a single button in the **bottom-left footer**: `↓ Export` (icon `Download` + the word "Export", nothing else). No more "Export Regulatory Audit" / "Export Ledger" variants.
+- One button = exports the current scope as CSV. Filename encodes scope.
+- Where a modal has multiple exportable things (ledger + chase timeline + comments), the button opens a tiny popover with checkboxes — defaults all checked.
 
-## 3. Banner on the parent (`src/components/DrilldownPanel.tsx`)
+---
 
-In `BreachDetail`, just above the existing Dependency fork card, render a banner when:
+## 3. CSV-only exports everywhere
 
-```text
-row.dependency?.status === 'resolved'
-  && row.resolutionStatus !== 'Resolved'
-  && row.status !== 'CLEAN'
-```
+- `exportMasterLedger` currently emits JSON → switch to CSV using existing `csvCell`/`csvRow` helpers in `exportLedger.ts`.
+- Keep JSON **only** for KPI-creation config-file *imports* (Admin panel).
+- Remove the JSON download path from `exportLedger.ts`.
 
-Banner content:
+---
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ ✓ Dependency SUB-12345 resolved by Network Ops · 14:32      │
-│                                                              │
-│ The blocking child ticket is closed. Verify telemetry and   │
-│ close this parent KPI?                            [ Verify & Close ]
-└─────────────────────────────────────────────────────────────┘
-```
+## 4. Back button fix
 
-Styling: `bg-rag-green/8` border, `border-rag-green`, `CheckCircle2` icon. Not pulsing — calm, not alarming.
+`BackButton` currently hides when `canGoBack=false`, so a single drilldown has nowhere to go and the button vanishes mid-flow. Fix:
 
-The **Verify & Close** button reuses the existing `onDeploy` path (Resolution Deployed → 3s telemetry hold → Closed) but with a different ledger phrasing:
+- BackButton always renders. If stack > 0 → pop. If stack empty but drilldown open → close (same as ×). Tooltip changes accordingly.
+- Back never "disappears" — it always goes one step back, ending at the main view.
 
-- `"Parent closure suggested by cascade rule"` (actor: SPOC · You)
-- followed by the existing Resolution Deployed / Ticket Closed entries
-- adds detail: `"Triggered by child resolution: SUB-12345 (Network Ops)"`
+---
 
-After click, the banner disappears (parent is now Verifying → Resolved).
+## 5. Dynamic control chart — `Time to Escalate`
 
-## 4. Dismiss / ignore path
+When `row.resolutionStatus === 'Resolved'`, render `Time to Escalate: Not applicable` (muted) instead of a live timer.
 
-A small `Dismiss` link on the banner (right side, muted) lets the SPOC say "no, I have more work to do here." Clicking it:
-- sets a local `dismissedCascade` flag on the row (`dependency.cascadeDismissed: true`)
-- writes ledger: `"Cascade suggestion dismissed"` (actor: SPOC · You)
-- banner hides for this row until something changes
+---
 
-Auditors get the negative trail too — important for "why didn't you close it?" reviews.
+## 6. Reassign modal — richer search + filters
 
-## 5. Surface the link elsewhere
+In the reassign dialog (`DrilldownPanel.tsx` L846+):
+- Search box matches name, LoB, system, AND department/designation.
+- Three filter dropdowns above the list: **LoB**, **Department/System**, **Designation** (SPOC / Lead / Manager). Multi-select. Default: pre-filter to current ticket's LoB+system so "someone else on the same team" is one click.
+- Show LoB + dept under each candidate's name so the auditor sees why they matched.
 
-- **GroupDrilldown row chips** (the system/process/lob list): rows with `dependency.status === 'resolved'` get a small `↩ child resolved` badge so SPOCs can spot them without opening each one.
-- **NotificationPanel**: add a "Cascade ready" group that lists every parent whose child resolved and which hasn't been closed/dismissed. One-click jumps into the drilldown.
+---
 
-## 6. Out of scope
+## 7. SPOC diagnostic modal — live Activity Log mirror
 
-- Hard cascade (auto-close without click) — explicitly rejected.
-- Multi-level cascades (grandchild → child → parent) — current model only has one fork depth, leaving it that way.
-- Reverse cascade (parent resolution closing children) — sub-tickets live on the other team's system; we only model the inbound signal.
+Add an **Activity Log** card to the BreachDetail SPOC view that mirrors `row.ledgerEntries` in human-readable form, newest-first. Same data source, friendly render: icons per action type, relative timestamps ("3m ago"), actor avatar. So users don't need to export the ledger to see what happened.
+
+---
+
+## 8. Comment box on Resolve
+
+When the user clicks **Resolve** / **Verify & Close**, open a small inline form instead of closing immediately:
+- Required textarea: "What was resolved?"
+- Optional media upload (item 10).
+- Submit → writes comment + media refs into the ledger entry's `details` and into the Activity Log.
+
+Same flow for the cascade close button.
+
+---
+
+## 9. LoB-view diagnostic modal — Escalation Trail
+
+Add a vertical timeline card **Escalation Trail** in the LoB drilldown showing every assignee this ticket has had: name → role → assigned-at → handed-off-at → reason. Derived from existing `row.escalations` + ledger entries (filter `Reassigned` / `Escalated`). No new state.
+
+---
+
+## 10. "Add media" everywhere there's a comment box
+
+Add an upload control (image/screenshot, multiple, max 5MB each) to:
+- Escalation comment
+- Resolve comment (item 8)
+- Cross-functional dependency comment (item 11)
+- Any future comment input
+
+Implementation: file read as data URL client-side (prototype, no backend yet), stored on the ledger entry as `attachments: string[]`. Render as thumbnails in the Activity Log. One shared `<CommentBoxWithMedia>` component used everywhere.
+
+---
+
+## 11. Cross-functional dependency tag — dropdown + comment **(revised per your note)**
+
+When the user clicks the cross-functional dependency tag action, open a small modal with:
+- **Team dropdown** — `DEPENDENCY_TEAMS` (Network Ops, Vendor Settlement, Identity, etc.)
+- **System dropdown** — from `registries.systems`
+- **LoB dropdown** — from `registries.lobs`
+- **Comment textarea** (plain placeholder "Add a note", no leading question)
+- **Add media** button (item 10)
+- Submit → appends a ledger entry with the routing + comment + attachments to the parent (and to the child SUB-ticket once spawned).
+
+No "why does this team own it?" prompt — just an open field.
+
+---
+
+## 12. Admin configuration panel — more outage examples
+
+In `AdminHealthView.tsx`, the connector-health section only models "Connector Outage". Add varied failure examples (text-only, no RAG tile, no green/amber):
+- "Schema drift detected on `payments_v2.metric_alerts` — 3 new columns ignored"
+- "Auth token rotated upstream; last successful poll 18m ago"
+- "Rate limit hit on metrics API (429) — backing off"
+- "Webhook signature mismatch from incident provider"
+- "Stale heartbeat: ServiceNow connector idle 42m (threshold 15m)"
+
+Render as a plain list with severity dot + timestamp + recommended action. No traffic-light styling.
+
+---
+
+## 13. Compliance view heading
+
+Change the page heading to `Compliance Auditor / System Analyst` so the same view reads for both personas.
+
+---
+
+## Out of scope (not in this build)
+- Real predictive ML for urgency — using existing `riskScore` as proxy.
+- Backend storage for uploaded media — data-URL only, prototype-grade.
+- Calendar-aware SPOC escalation (C3) and GREY/BLUE exit criteria (C2) — still open from earlier.
 
 ## Files touched
-
-- `src/lib/mockData.ts` — extend `DependencyFork`, seed resolvedAt/resolvedBy, seed demo banner rows
-- `src/lib/filterContext.tsx` — child-resolution sweep + cascade-aware mutate helpers
-- `src/components/DrilldownPanel.tsx` — banner, Verify & Close handler, dismiss link, GroupDrilldown chip
-- `src/components/NotificationPanel.tsx` — Cascade-ready group
-
-## Still pending your decision (not in this plan)
-
-- **C2** GREY / BLUE exit criteria (heartbeat-driven recovery)
-- **C3** Calendar-aware SPOC escalation (on-call roster vs. business calendar vs. full ITIL)
-
-Want me to fold C2 + C3 into the same build, or ship cascade first and pick those up after?
+- `src/lib/mockData.ts` — impactTier, urgencyScore, sevMatrix, hardcoded tier mapping
+- `src/lib/filterContext.tsx` — Back button fallback
+- `src/lib/exportLedger.ts` — JSON → CSV, single export entrypoint
+- `src/components/GlobalFilterBar.tsx` — remove export pill, add Severity + Impact chips
+- `src/components/DrilldownPanel.tsx` — footer export, back fix, NA escalate, reassign search, activity log, resolve comment, escalation trail, dependency modal
+- `src/components/views/ComplianceView.tsx` — heading
+- `src/components/views/AdminHealthView.tsx` — outage examples
+- `src/components/CommentBoxWithMedia.tsx` — **new**, shared
