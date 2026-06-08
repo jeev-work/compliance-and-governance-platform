@@ -704,6 +704,8 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
         {/* Role-gated actions */}
 
         <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center gap-2 flex-wrap rounded-b-lg">
+          <FooterExport onClick={onExport} />
+          <div className="w-px h-5 bg-border mx-1" />
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mr-1">Actions</span>
           {actions.includes('acknowledge') && (
             <ActionBtn
