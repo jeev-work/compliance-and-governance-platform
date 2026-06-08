@@ -11,7 +11,7 @@ const RAG_HSL: Record<RagState, string> = {
   RED: 'hsl(0 72% 51%)',
   GREY: 'hsl(220 9% 55%)',
   BLUE: 'hsl(199 89% 58%)',
-  UNCONFIGURED: 'hsl(215 15% 35%)',
+  UNCONFIGURED: 'hsl(265 20% 55%)',
 };
 
 export function ExecutiveView() {
@@ -118,7 +118,13 @@ export function ExecutiveView() {
           <div className="grid grid-cols-3 gap-1 mt-2">
             {ragDist.map(d => (
               <div key={d.name} className="flex items-center gap-1 text-[9px]">
-                <span className="w-2 h-2 rounded-sm" style={{ background: RAG_HSL[d.name as RagState] }} />
+                <span
+                  className="w-2 h-2 rounded-sm"
+                  style={{
+                    background: RAG_HSL[d.name as RagState],
+                    border: d.name === 'UNCONFIGURED' ? '1px dashed hsl(var(--rag-unconfigured))' : undefined,
+                  }}
+                />
                 <span className="text-muted-foreground">{d.name}</span>
                 <span className="font-mono ml-auto">{d.value}</span>
               </div>
