@@ -1,15 +1,16 @@
 import { useFilters } from '@/lib/filterContext';
-import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone, ASSIGNEES } from '@/lib/mockData';
-import { exportMicroLedger } from '@/lib/exportLedger';
+import { ChaseStep, KPIRow, RagState, LedgerEntry, getContactPhone, ASSIGNEES, IMPACT_LABEL } from '@/lib/mockData';
+import { exportMicroLedger, exportKpiRowsCsv } from '@/lib/exportLedger';
 import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, FileDown, ShieldAlert, Lock, Timer, Phone, ArrowLeft,
+  Flag, Wrench, GitFork, Send, Lock, Timer, Phone, ArrowLeft, Download, Activity, Search,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
+import { CommentBoxWithMedia, AttachmentThumbs, CommentSubmission } from '@/components/CommentBoxWithMedia';
 
 /** Inline contact phone badge — shown next to any displayed person name. */
 function ContactPhone({ name }: { name: string | null | undefined }) {
@@ -41,11 +42,11 @@ const ASSIGNEE_POOL = [
   { name: 'P. Novak',    role: 'CTO' },
 ];
 
-function newLedgerEntry(action: string, actor: string, details?: string): LedgerEntry {
+function newLedgerEntry(action: string, actor: string, details?: string, attachments?: string[]): LedgerEntry {
   const hex = 'abcdef0123456789';
   let h = '';
   for (let i = 0; i < 16; i++) h += hex[Math.floor(Math.random() * 16)];
-  return { timestamp: new Date().toISOString(), actor, action, hash: `LDG-${h}`, details };
+  return { timestamp: new Date().toISOString(), actor, action, hash: `LDG-${h}`, details, attachments };
 }
 
 const RAG_BG: Record<RagState, string> = {
@@ -60,16 +61,18 @@ const RAG_BG: Record<RagState, string> = {
 export function DrilldownPanel() {
   const { drilldown, closeDrilldown, filteredData, openDrilldown, drilldownStack, popDrilldown } = useFilters();
   if (!drilldown.type) return null;
-  const canGoBack = drilldownStack.length > 0;
+  // Back always goes one step back — if stack is empty, it closes (instead of disappearing).
+  const goBack = drilldownStack.length > 0 ? popDrilldown : closeDrilldown;
+  const backLabel = drilldownStack.length > 0 ? 'Back to previous drilldown' : 'Close';
 
   if (drilldown.type === 'breach' && drilldown.row) {
-    return <BreachDetail row={drilldown.row} onClose={closeDrilldown} onBack={canGoBack ? popDrilldown : undefined} />;
+    return <BreachDetail row={drilldown.row} onClose={closeDrilldown} onBack={goBack} backLabel={backLabel} />;
   }
   if (drilldown.type === 'matrixCell' && drilldown.value) {
     const [sys, proc] = drilldown.value.split('||');
     const rows = filteredData.filter(r => r.system === sys && r.process === proc);
     return <MatrixCellDrilldown system={sys} process={proc} rows={rows} onClose={closeDrilldown}
-      onBack={canGoBack ? popDrilldown : undefined}
+      onBack={goBack} backLabel={backLabel}
       onSelect={(row) => openDrilldown('breach', row.id, row)} />;
   }
   if (drilldown.type === 'system' || drilldown.type === 'process' || drilldown.type === 'lob') {
@@ -77,21 +80,33 @@ export function DrilldownPanel() {
     const v = drilldown.value!;
     const rows = filteredData.filter(r => r[k] === v);
     return <GroupDrilldown type={k} value={v} rows={rows} onClose={closeDrilldown}
-      onBack={canGoBack ? popDrilldown : undefined}
+      onBack={goBack} backLabel={backLabel}
       onSelectBreach={(row) => openDrilldown('breach', row.id, row)} />;
   }
   return null;
 }
 
-function BackButton({ onBack }: { onBack?: () => void }) {
-  if (!onBack) return null;
+function BackButton({ onBack, label = 'Back' }: { onBack: () => void; label?: string }) {
   return (
     <button
       onClick={onBack}
       className="p-1 hover:bg-accent rounded flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
-      title="Back to previous drilldown"
+      title={label}
     >
       <ArrowLeft className="h-3.5 w-3.5" /> Back
+    </button>
+  );
+}
+
+/** Compact bottom-left footer Export button used by every drilldown modal. */
+function FooterExport({ onClick, label = 'Export' }: { onClick: () => void; label?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="text-[11px] font-semibold px-2.5 py-1 rounded border bg-primary/15 border-primary/40 text-primary hover:bg-primary/25 flex items-center gap-1"
+      title="Export as CSV"
+    >
+      <Download className="h-3 w-3" /> {label}
     </button>
   );
 }
