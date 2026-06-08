@@ -103,6 +103,7 @@ export type KPIRow = {
   chaseTimeline: ChaseEvent[];
   dependency: DependencyFork | null;
   executiveFlag: boolean;       // Solution Blueprint §2 Exception 4
+  executiveFlagSetAt: string | null;  // ISO timestamp; auto-expires after 24h
   auditLedgerId: string;        // hashed-looking immutable ledger ref
   maintenanceWindow: string | null;
   timeToDetectMin: number | null;
@@ -371,6 +372,7 @@ export function generateMockData(count = 30000): KPIRow[] {
         executiveFlag = true;
         stateFlags.push('Escalated');
       }
+
 
       // Escalations
       const numEsc = resolutionStatus === 'Escalated to HOD' ? Math.floor(rand() * 3) + 2 : Math.floor(rand() * 2);
