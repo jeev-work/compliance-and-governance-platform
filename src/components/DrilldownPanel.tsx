@@ -1098,6 +1098,9 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, backLabel, onSelec
             {breached.length > 50 && <div className="text-center text-[10px] text-muted-foreground py-1">+{breached.length - 50} more</div>}
           </div>
         </div>
+        <div className="px-4 py-2 border-t border-border bg-accent/10 rounded-b-lg flex items-center gap-2">
+          <FooterExport onClick={() => { exportKpiRowsCsv(rows, `${type}-${value}`); toast.success(`Exported ${rows.length} rows`); }} />
+        </div>
       </div>
     </div>
   );
