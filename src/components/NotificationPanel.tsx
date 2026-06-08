@@ -122,6 +122,26 @@ export function NotificationPanel() {
       }
     }
 
+    // Cascade-ready: child sub-ticket resolved, parent still open, not dismissed.
+    // Surfaced for every role — auditors care, SPOCs need to act, execs notice closure velocity.
+    filteredData.forEach(r => {
+      if (
+        r.dependency
+        && r.dependency.status === 'resolved'
+        && !r.dependency.cascadeDismissed
+        && r.resolutionStatus !== 'Resolved'
+        && r.status !== 'CLEAN'
+      ) {
+        list.push({
+          id: `cascade-${r.id}`,
+          icon: CheckCircle2,
+          tone: 'green',
+          reason: `Cascade ready · child ${r.dependency.linkedId} resolved by ${r.dependency.team}`,
+          row: r,
+        });
+      }
+    });
+
     // Sort: red > amber > blue/grey > green; newest first within tone.
     const toneRank: Record<NotifTone, number> = { red: 0, amber: 1, blue: 2, grey: 3, green: 4 };
     list.sort((a, b) => {
