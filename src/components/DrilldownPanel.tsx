@@ -124,7 +124,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <BackButton onBack={onBack} />
+            <BackButton onBack={onBack} label={backLabel} />
             <Shield className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-sm font-semibold">{system} × {process}</h2>
@@ -424,7 +424,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-3">
-            <BackButton onBack={onBack} />
+            <BackButton onBack={onBack} label={backLabel} />
             <AlertTriangle className={cn('h-5 w-5',
               row.severity === 'Critical' ? 'rag-red' : row.severity === 'High' ? 'rag-amber' : 'text-muted-foreground',
             )} />
@@ -547,8 +547,8 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
             icon={Timer}
             color={isClosed ? 'text-muted-foreground' : countdown.tone === 'red' ? 'rag-red' : countdown.tone === 'amber' ? 'rag-amber' : countdown.tone === 'green' ? 'rag-green' : 'text-muted-foreground'}
             label={isClosed ? 'Time to Escalate' : countdown.overdue ? 'Escalate · OVERDUE' : 'Time to Escalate'}
-            value={isClosed ? '—' : countdown.label}
-            caption={isClosed ? 'ticket closed' : undefined}
+            value={isClosed ? 'Not applicable' : countdown.label}
+            caption={isClosed ? 'ticket resolved' : undefined}
           />
           <TS icon={CheckCircle2} color="rag-green" label="Time to Resolve" value={fmtMinutes(row.timeToResolveMin)} />
           <TS
@@ -976,7 +976,7 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, backLabel, onSelec
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl mx-4 mb-8 shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <BackButton onBack={onBack} />
+            <BackButton onBack={onBack} label={backLabel} />
             <Shield className="h-5 w-5 text-primary" />
             <div>
               <h2 className="text-sm font-semibold">{value}</h2>
