@@ -295,19 +295,40 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
     }, 3000);
   };
 
-  const openEnableDep  = () => setDepModal({ mode: 'enable',  team: DEPENDENCY_TEAMS[0], reason: '', step: 'form' });
-  const openDisableDep = () => setDepModal({ mode: 'disable', team: row.dependency?.team ?? '', reason: '', step: 'confirm' });
+  const openEnableDep  = () => setDepModal({
+    mode: 'enable',
+    team: DEPENDENCY_TEAMS[0],
+    system: row.system,
+    lob: row.lob,
+    comment: '',
+    attachments: [],
+    step: 'form',
+  });
+  const openDisableDep = () => setDepModal({
+    mode: 'disable',
+    team: row.dependency?.team ?? '',
+    system: row.system,
+    lob: row.lob,
+    comment: '',
+    attachments: [],
+    step: 'confirm',
+  });
 
-  const commitEnableDep = (team: string, reason: string) => {
+  const commitEnableDep = (d: { team: string; system: string; lob: string; comment: string; attachments: string[] }) => {
     const ts = new Date().toISOString();
+    const routing = `${d.team} · ${d.system} · LoB ${d.lob}`;
     mutateRow(row.id, {
-      dependency: { team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open', resolvedAt: null, resolvedBy: null, cascadeDismissed: false },
+      dependency: { team: d.team, timestamp: ts, linkedId: `SUB-${10000 + Math.floor(Math.random() * 89999)}`, status: 'open', resolvedAt: null, resolvedBy: null, cascadeDismissed: false },
       stateFlags: [...row.stateFlags.filter(f => f !== 'Cross-Functional'), 'Cross-Functional'],
-      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${team}` }],
-      ledgerEntries: appendLedger(newLedgerEntry('Multi-Team Dependency ENABLED', 'SPOC · You', `Notified ${team}${reason ? ` · ${reason}` : ''} · primary SLA timer paused`)),
+      chaseTimeline: [...row.chaseTimeline, { step: 'Notified', timestamp: ts, actor: `Dependency → ${d.team}` }],
+      ledgerEntries: appendLedger(newLedgerEntry(
+        'Multi-Team Dependency ENABLED', 'SPOC · You',
+        `Routed to ${routing}${d.comment ? ` · ${d.comment}` : ''} · primary SLA timer paused`,
+        d.attachments,
+      )),
     });
     setDepModal(null);
-    toast.success(`Multi-team dependency ENABLED → ${team} notified · ledgered`);
+    toast.success(`Multi-team dependency ENABLED → ${d.team} notified · ledgered`);
   };
   const commitDisableDep = () => {
     const ts = new Date().toISOString();
@@ -350,6 +371,10 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
   const openReassignModal = () => setReassignModal({
     assignee: ASSIGNEES.find(a => a.name !== row.assignee?.name)?.name ?? ASSIGNEES[0].name,
     reason: '',
+    query: '',
+    lobFilter: row.lob,
+    deptFilter: row.system,
+    designationFilter: '',
   });
   const commitReassign = (assigneeName: string, note: string) => {
     const next = ASSIGNEES.find(a => a.name === assigneeName) ?? ASSIGNEES[0];
@@ -735,7 +760,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
             <ActionBtn
               icon={Wrench}
               label="Deploy Resolution"
-              onClick={onDeploy}
+              onClick={() => setResolveModal({ mode: 'standard', comment: '', attachments: [] })}
               variant="primary"
               disabled={row.status === 'CLEAN' || row.resolutionStatus === 'Verifying' || row.resolutionStatus === 'Resolved'}
               disabledLabel={row.resolutionStatus === 'Verifying' ? 'Verifying…' : 'Resolution Deployed'}
