@@ -7,9 +7,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Info, Search, X } from 'lucide-react';
+import { CalendarIcon, Info, Search, X, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
+import { exportKpiRowsCsv, exportFilteredLedgersCsv, exportMasterLedger, exportMicroLedger } from '@/lib/exportLedger';
+import { toast } from 'sonner';
 
 const PRESETS: DatePreset[] = ['1H', '24H', '7D', '30D', '60D', '90D'];
 
@@ -23,7 +25,7 @@ const RAG_COLORS: Record<RagState, string> = {
 };
 
 export function GlobalFilterBar() {
-  const { filters, setFilters, filteredData } = useFilters();
+  const { filters, setFilters, filteredData, masterLedger, configSnapshots, drilldown } = useFilters();
   const [customOpen, setCustomOpen] = useState(false);
 
   const toggleArr = <K extends 'lobs' | 'systems' | 'processes' | 'stateFlags' | 'ragStates' | 'severities'>(
@@ -222,6 +224,54 @@ export function GlobalFilterBar() {
           </span>
         )}
         <span className="text-[10px] text-muted-foreground font-mono">{filteredData.length.toLocaleString()} records</span>
+        <div className="w-px h-5 bg-border" />
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              className="h-7 text-[11px] font-semibold px-2 rounded border bg-primary/15 border-primary/40 text-primary hover:bg-primary/25 flex items-center gap-1"
+              aria-label="Export"
+            >
+              <FileDown className="h-3 w-3" /> Export
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72 p-1">
+            <ExportItem
+              title="Current view (CSV)"
+              subtitle={`${filteredData.length.toLocaleString()} rows · what you see`}
+              onClick={() => {
+                exportKpiRowsCsv(filteredData, `current-view-${filters.role}`);
+                toast.success(`Exported ${filteredData.length.toLocaleString()} rows`);
+              }}
+            />
+            <ExportItem
+              title="Filtered KPIs + ledgers (CSV)"
+              subtitle="Every ledger entry across visible rows"
+              onClick={() => {
+                exportFilteredLedgersCsv(filteredData, configSnapshots, `filtered-ledgers-${filters.role}`);
+                toast.success('Filtered ledgers exported · snapshot-stamped');
+              }}
+            />
+            <ExportItem
+              title="Master ledger bundle (JSON)"
+              subtitle={`${masterLedger.length} master events · all snapshots`}
+              onClick={() => {
+                exportMasterLedger(masterLedger, configSnapshots);
+                toast.success('Master ledger exported · snapshot-stamped');
+              }}
+            />
+            <ExportItem
+              title="Selected KPI micro-ledger (CSV)"
+              subtitle={drilldown.row ? `${drilldown.row.id} · ${drilldown.row.ledgerEntries.length} entries` : 'Open a KPI from drilldown first'}
+              disabled={!drilldown.row}
+              onClick={() => {
+                if (!drilldown.row) return;
+                const r = drilldown.row;
+                exportMicroLedger({ kind: 'kpi', name: r.id }, r.ledgerEntries, configSnapshots, r);
+                toast.success(`Micro ledger exported · ${r.id}`);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );
@@ -264,5 +314,23 @@ function MultiSelect({ options, selected, onToggle, onClear }: {
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function ExportItem({ title, subtitle, onClick, disabled }: {
+  title: string; subtitle: string; onClick: () => void; disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'w-full text-left px-2 py-1.5 rounded hover:bg-accent transition-colors',
+        disabled && 'opacity-40 cursor-not-allowed hover:bg-transparent',
+      )}
+    >
+      <div className="text-xs font-semibold text-foreground">{title}</div>
+      <div className="text-[10px] text-muted-foreground">{subtitle}</div>
+    </button>
   );
 }

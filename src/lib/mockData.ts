@@ -212,14 +212,34 @@ const SYSTEM_BIAS: Record<string, { green: number; amber: number; red: number; g
   'Auth Engine':     { green: 0.96, amber: 0.03, red: 0.005, grey: 0.003, blue: 0.000 },
 };
 
-function pickRagState(rand: () => number, system?: string): RagState {
+/** Per-LoB stress multiplier on amber/red. Keeps B2C healthy, B2B mixed, Wheels the hot zone. */
+const LOB_BIAS: Record<string, number> = { B2C: 0.35, B2B: 1.0, Wheels: 2.4 };
+
+/** Per-process realistic daily volume bands (min, max). */
+const PROCESS_VOLUME: Record<string, [number, number]> = {
+  'KYC Verification': [5000, 25000],
+  'API Uptime':       [50000, 200000],
+  'Ledger Sync':      [2000, 8000],
+  'AML Screening':    [8000, 40000],
+  'Ticket Routing':   [1000, 5000],
+  'DB Backup':        [100, 800],
+};
+
+function pickRagState(rand: () => number, system?: string, lob?: string): RagState {
   const b = (system && SYSTEM_BIAS[system]) || { green: 0.88, amber: 0.07, red: 0.03, grey: 0.01, blue: 0.008 };
+  const m = (lob && LOB_BIAS[lob]) ?? 1;
+  const amber = Math.min(0.45, b.amber * m);
+  const red   = Math.min(0.35, b.red   * m);
+  const grey  = b.grey;
+  const blue  = b.blue;
+  const unc   = 0.003;
+  const green = Math.max(0, 1 - amber - red - grey - blue - unc);
   const r = rand();
-  let acc = b.green;       if (r < acc) return 'GREEN';
-  acc += b.amber;          if (r < acc) return 'AMBER';
-  acc += b.red;            if (r < acc) return 'RED';
-  acc += b.grey;           if (r < acc) return 'GREY';
-  acc += b.blue;           if (r < acc) return 'BLUE';
+  let acc = green;        if (r < acc) return 'GREEN';
+  acc += amber;           if (r < acc) return 'AMBER';
+  acc += red;             if (r < acc) return 'RED';
+  acc += grey;            if (r < acc) return 'GREY';
+  acc += blue;            if (r < acc) return 'BLUE';
   return 'UNCONFIGURED';
 }
 
@@ -247,7 +267,7 @@ export function generateMockData(count = 30000): KPIRow[] {
     const source = pick(rand, SOURCES);
     const lob = pick(rand, LOBS);
 
-    let ragState = pickRagState(rand, system);
+    let ragState = pickRagState(rand, system, lob);
 
     // Cluster the Grey outage on a specific system + window
     const inOutageWindow = Math.abs(ts.getTime() - greyOutageStart.getTime()) < 6 * 3600000;
@@ -258,10 +278,11 @@ export function generateMockData(count = 30000): KPIRow[] {
       system === 'Core Banking' && ts.getUTCDay() === 6 && ts.getUTCHours() >= 2 && ts.getUTCHours() < 6;
     if (isMaintWindow) ragState = 'BLUE';
 
-    const baseVolume = Math.floor(rand() * 500000) + 1000;
+    const volBand = PROCESS_VOLUME[process] ?? [1000, 10000];
+    const baseVolume = Math.floor(rand() * (volBand[1] - volBand[0])) + volBand[0];
     let breaches = 0;
-    if (ragState === 'AMBER') breaches = Math.floor(rand() * 20) + 1;       // 1–20 br
-    else if (ragState === 'RED') breaches = Math.floor(rand() * 75) + 5;    // 5–80 br
+    if (ragState === 'AMBER') breaches = Math.floor(rand() * 20) + 1;       // 1–20 breaches
+    else if (ragState === 'RED') breaches = Math.floor(rand() * 75) + 5;    // 5–80 breaches
     const failureRate = breaches === 0 ? 0 : parseFloat(((breaches / baseVolume) * 100).toFixed(4));
     const status: KPIRow['status'] = ragState === 'RED' || ragState === 'AMBER' ? 'BREACHED' : 'CLEAN';
 

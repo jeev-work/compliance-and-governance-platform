@@ -46,10 +46,11 @@ export function ExecutiveView() {
   }, [filteredData]);
 
   const lobBreaches = useMemo(() => {
-    const m = new Map<string, { breaches: number; critical: number }>();
+    const m = new Map<string, { breaches: number; critical: number; rows: number }>();
     filteredData.forEach(r => {
-      const c = m.get(r.lob) || { breaches: 0, critical: 0 };
+      const c = m.get(r.lob) || { breaches: 0, critical: 0, rows: 0 };
       c.breaches += r.breaches;
+      c.rows++;
       if (r.severity === 'Critical') c.critical++;
       m.set(r.lob, c);
     });
@@ -181,7 +182,11 @@ export function ExecutiveView() {
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: 'hsl(215 15% 50%)' }} width={50} />
                 <Tooltip {...CHART_TOOLTIP} />
                 <Bar dataKey="breaches" cursor="pointer">
-                  {lobBreaches.map((d, i) => <Cell key={i} fill={d.critical > 0 ? 'hsl(0 72% 51%)' : 'hsl(38 92% 50%)'} />)}
+                  {lobBreaches.map((d, i) => {
+                    const ratio = d.rows > 0 ? d.critical / d.rows : 0;
+                    const fill = ratio > 0.02 ? 'hsl(0 72% 51%)' : (ratio > 0.005 || d.breaches > 0) ? 'hsl(38 92% 50%)' : 'hsl(142 71% 45%)';
+                    return <Cell key={i} fill={fill} />;
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

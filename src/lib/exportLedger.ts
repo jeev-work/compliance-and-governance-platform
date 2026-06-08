@@ -82,3 +82,55 @@ export function exportMicroLedger(
   const file = `micro-ledger-${scope.kind}-${scope.name.replace(/[^a-z0-9]+/gi, '_')}-${Date.now()}.csv`;
   download(file, csv, 'text/csv;charset=utf-8');
 }
+
+/** Export the current visible KPI rows as CSV (one row per KPI). */
+export function exportKpiRowsCsv(rows: KPIRow[], label = 'kpi-rows') {
+  const header = [
+    'kpi_id', 'timestamp', 'lob', 'system', 'process', 'source',
+    'rag_state', 'severity', 'status', 'resolution_status',
+    'base_volume', 'breaches', 'failure_rate_pct', 'target_sla',
+    'sla_version', 'config_snapshot_id', 'audit_ledger_id',
+    'assignee', 'executive_flag', 'dependency_team',
+    'time_to_detect_min', 'time_to_escalate_min', 'time_to_resolve_min',
+    'ledger_entry_count',
+  ];
+  const out: string[] = [csvRow(header)];
+  for (const r of rows) {
+    out.push(csvRow([
+      r.id, r.timestamp, r.lob, r.system, r.process, r.source,
+      r.ragState, r.severity, r.status, r.resolutionStatus,
+      r.baseVolume, r.breaches, r.failureRate, r.targetSLA,
+      r.slaVersion, r.configSnapshotId, r.auditLedgerId,
+      r.assignee?.name ?? '', r.executiveFlag ? 'YES' : '',
+      r.dependency?.team ?? '',
+      r.timeToDetectMin ?? '', r.timeToEscalateMin ?? '', r.timeToResolveMin ?? '',
+      r.ledgerEntries.length,
+    ]));
+  }
+  const csv = out.join('\r\n') + '\r\n';
+  download(`${label}-${Date.now()}.csv`, csv, 'text/csv;charset=utf-8');
+}
+
+/** Flatten every ledger entry across a set of KPI rows into one CSV. */
+export function exportFilteredLedgersCsv(rows: KPIRow[], snapshots: ConfigSnapshot[], label = 'filtered-ledgers') {
+  const header = [
+    'timestamp', 'actor', 'action', 'details', 'hash',
+    'kpi_id', 'lob', 'system', 'process',
+    'config_snapshot_id_at_event', 'config_rules_at_event',
+    'current_sla_version', 'current_rag', 'current_resolution_status',
+  ];
+  const out: string[] = [csvRow(header)];
+  for (const r of rows) {
+    const stamped = stamp(r.ledgerEntries, snapshots);
+    for (const e of stamped) {
+      out.push(csvRow([
+        e.timestamp, e.actor, e.action, e.details ?? '', e.hash,
+        r.id, r.lob, r.system, r.process,
+        e.configSnapshotId ?? '', e.configRules ?? '',
+        r.slaVersion, r.ragState, r.resolutionStatus,
+      ]));
+    }
+  }
+  const csv = out.join('\r\n') + '\r\n';
+  download(`${label}-${Date.now()}.csv`, csv, 'text/csv;charset=utf-8');
+}
