@@ -186,7 +186,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel
           })}
           {sorted.length === 0 && <div className="text-[10px] text-muted-foreground italic text-center py-4">No KPIs in this intersection for the current filter scope.</div>}
         </div>
-        <div className="px-4 py-2 border-t border-border bg-accent/10 rounded-b-lg flex items-center gap-2">
+        <div className="px-4 py-2 border-t border-border bg-accent/10 rounded-b-lg flex items-center gap-2 justify-end">
           <FooterExport onClick={() => { exportKpiRowsCsv(rows, `cell-${system}-${process}`); toast.success(`Exported ${rows.length} rows`); }} />
         </div>
       </div>
@@ -746,8 +746,6 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
         {/* Role-gated actions */}
 
         <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center gap-2 flex-wrap rounded-b-lg">
-          <FooterExport onClick={onExport} />
-          <div className="w-px h-5 bg-border mx-1" />
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mr-1">Actions</span>
           {actions.includes('acknowledge') && (
             <ActionBtn
@@ -797,6 +795,9 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           {actions.length === 0 && (
             <span className="text-[10px] text-muted-foreground italic">Read-only role · no actions available</span>
           )}
+          <div className="ml-auto">
+            <FooterExport onClick={onExport} />
+          </div>
         </div>
       </div>
 
@@ -1277,7 +1278,7 @@ function GroupDrilldown({ type, value, rows, onClose, onBack, backLabel, onSelec
             {breached.length > 50 && <div className="text-center text-[10px] text-muted-foreground py-1">+{breached.length - 50} more</div>}
           </div>
         </div>
-        <div className="px-4 py-2 border-t border-border bg-accent/10 rounded-b-lg flex items-center gap-2">
+        <div className="px-4 py-2 border-t border-border bg-accent/10 rounded-b-lg flex items-center gap-2 justify-end">
           <FooterExport onClick={() => { exportKpiRowsCsv(rows, `${type}-${value}`); toast.success(`Exported ${rows.length} rows`); }} />
         </div>
       </div>
