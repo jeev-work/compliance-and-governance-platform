@@ -85,7 +85,7 @@ export function useFilters() {
   return c;
 }
 
-const seedData = generateMockData(30000);
+const seedData = generateMockData(1800);
 const BASELINE = new Date(2026, 4, 14);
 
 function presetToCutoff(p: DatePreset): Date {

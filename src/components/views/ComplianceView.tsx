@@ -48,12 +48,6 @@ export function ComplianceView() {
         <span className="text-[10px] text-muted-foreground italic mr-auto">
           Exports stamp every entry with the SLA config snapshot active at incident time — never the current config.
         </span>
-        <button
-          onClick={() => { exportMasterLedger(masterLedger, configSnapshots); toast.success('Master ledger exported · snapshot-stamped'); }}
-          className="text-[10px] font-semibold px-2 py-1 rounded border bg-rag-amber border-rag-amber rag-amber hover:opacity-80 flex items-center gap-1"
-        >
-          <FileDown className="h-3 w-3" /> Export
-        </button>
       </div>
       {/* KPI tiles */}
       <div className="grid grid-cols-6 gap-2">

@@ -66,10 +66,6 @@ export function AdminHealthView() {
             className="text-[10px] font-semibold px-2 py-1 rounded border bg-secondary border-border hover:bg-accent flex items-center gap-1">
             <Layers className="h-3 w-3" /> Add Department
           </button>
-          <button onClick={() => { exportMasterLedger(masterLedger, configSnapshots); toast.success('Master ledger exported · snapshot-stamped'); }}
-            className="text-[10px] font-semibold px-2 py-1 rounded border bg-rag-amber border-rag-amber rag-amber hover:opacity-80 flex items-center gap-1">
-            <Download className="h-3 w-3" /> Export
-          </button>
         </div>
       </div>
 
