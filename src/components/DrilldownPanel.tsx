@@ -821,13 +821,14 @@ function ActionBtn({ icon: Icon, label, onClick, variant = 'default', disabled =
   );
 }
 
-function TS({ icon: Icon, color, label, value }: { icon: any; color: string; label: string; value: string }) {
+function TS({ icon: Icon, color, label, value, caption }: { icon: any; color: string; label: string; value: string; caption?: string }) {
   return (
     <div className="flex items-center gap-2">
       <Icon className={cn('h-3.5 w-3.5', color)} />
       <div>
         <div className="text-[9px] text-muted-foreground uppercase">{label}</div>
         <div className="text-xs font-mono font-semibold">{value}</div>
+        {caption && <div className="text-[9px] text-muted-foreground italic">{caption}</div>}
       </div>
     </div>
   );
