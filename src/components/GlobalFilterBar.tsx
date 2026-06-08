@@ -316,3 +316,21 @@ function MultiSelect({ options, selected, onToggle, onClear }: {
     </Select>
   );
 }
+
+function ExportItem({ title, subtitle, onClick, disabled }: {
+  title: string; subtitle: string; onClick: () => void; disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'w-full text-left px-2 py-1.5 rounded hover:bg-accent transition-colors',
+        disabled && 'opacity-40 cursor-not-allowed hover:bg-transparent',
+      )}
+    >
+      <div className="text-xs font-semibold text-foreground">{title}</div>
+      <div className="text-[10px] text-muted-foreground">{subtitle}</div>
+    </button>
+  );
+}
