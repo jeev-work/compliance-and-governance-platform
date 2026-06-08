@@ -635,7 +635,36 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           </div>
         )}
 
-        {/* Immutable Ledger */}
+        {/* Activity Log — human-friendly mirror of the immutable ledger */}
+        {row.ledgerEntries.length > 0 && (
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
+              <Activity className="h-3 w-3" /> Activity Log ({row.ledgerEntries.length})
+              <span className="ml-auto text-[9px] text-muted-foreground italic font-normal normal-case tracking-normal">Same data as the ledger below — no export required.</span>
+            </h3>
+            <div className="space-y-1.5 max-h-[200px] overflow-y-auto scrollbar-thin">
+              {[...row.ledgerEntries].reverse().map((l, i) => (
+                <div key={i} className="text-[11px] px-2.5 py-1.5 rounded bg-accent/20 border border-border/40">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn('inline-block h-1.5 w-1.5 rounded-full',
+                      /Closed|Resolution Deployed|Verifying/i.test(l.action) ? 'bg-rag-green' :
+                      /Escalated|EXECUTIVE|Reassigned/i.test(l.action) ? 'bg-rag-red' :
+                      /Acknowledged|Dependency|cascade/i.test(l.action) ? 'bg-rag-amber' :
+                      'bg-primary',
+                    )} />
+                    <span className="font-semibold text-foreground">{l.action}</span>
+                    <span className="text-muted-foreground">· {l.actor}</span>
+                    <span className="ml-auto font-mono text-[10px] text-muted-foreground">{relTime(l.timestamp)}</span>
+                  </div>
+                  {l.details && <div className="text-muted-foreground mt-0.5 pl-3.5">{l.details}</div>}
+                  <AttachmentThumbs urls={l.attachments} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Immutable Ledger (raw / WORM trail) */}
         {row.ledgerEntries.length > 0 && (
           <div className="px-4 py-3 border-b border-border">
             <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
@@ -651,6 +680,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
                     <span className="ml-auto text-muted-foreground">{l.hash}</span>
                   </div>
                   {l.details && <div className="text-muted-foreground mt-0.5 font-sans">{l.details}</div>}
+                  <AttachmentThumbs urls={l.attachments} />
                 </div>
               ))}
             </div>
