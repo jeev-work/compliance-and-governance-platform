@@ -473,6 +473,36 @@ function BreachDetail({ row, onClose, onBack }: { row: KPIRow; onClose: () => vo
           </div>
         )}
 
+        {/* Cascade auto-suggest banner — child resolved, prompt parent close */}
+        {showCascadeBanner && row.dependency && (
+          <div className="mx-4 my-3 px-3 py-2.5 rounded border border-rag-green bg-rag-green flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 rag-green shrink-0 mt-0.5" />
+            <div className="flex-1 text-[11px]">
+              <div className="font-semibold text-foreground">
+                Dependency <span className="font-mono">{row.dependency.linkedId}</span> resolved by {row.dependency.resolvedBy ?? row.dependency.team}
+                {row.dependency.resolvedAt && (
+                  <span className="text-muted-foreground font-normal"> · {new Date(row.dependency.resolvedAt).toLocaleString()}</span>
+                )}
+              </div>
+              <div className="text-muted-foreground mt-0.5">
+                The blocking child ticket is closed. Verify telemetry and close this parent KPI?
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={onCascadeDismiss}
+                className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+              >Dismiss</button>
+              <button
+                onClick={onCascadeClose}
+                className="text-[11px] px-2.5 py-1 rounded border border-rag-green bg-rag-green rag-green font-semibold hover:opacity-80 flex items-center gap-1"
+              >
+                <CheckCircle2 className="h-3 w-3" /> Verify &amp; Close
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Dependency fork */}
         {row.dependency && (
           <div className="mx-4 my-3 px-3 py-2 rounded border border-chart-5/30 bg-chart-5/5">
