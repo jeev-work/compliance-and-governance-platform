@@ -267,7 +267,7 @@ export function generateMockData(count = 30000): KPIRow[] {
     const source = pick(rand, SOURCES);
     const lob = pick(rand, LOBS);
 
-    let ragState = pickRagState(rand, system);
+    let ragState = pickRagState(rand, system, lob);
 
     // Cluster the Grey outage on a specific system + window
     const inOutageWindow = Math.abs(ts.getTime() - greyOutageStart.getTime()) < 6 * 3600000;
@@ -278,10 +278,11 @@ export function generateMockData(count = 30000): KPIRow[] {
       system === 'Core Banking' && ts.getUTCDay() === 6 && ts.getUTCHours() >= 2 && ts.getUTCHours() < 6;
     if (isMaintWindow) ragState = 'BLUE';
 
-    const baseVolume = Math.floor(rand() * 500000) + 1000;
+    const volBand = PROCESS_VOLUME[process] ?? [1000, 10000];
+    const baseVolume = Math.floor(rand() * (volBand[1] - volBand[0])) + volBand[0];
     let breaches = 0;
-    if (ragState === 'AMBER') breaches = Math.floor(rand() * 20) + 1;       // 1–20 br
-    else if (ragState === 'RED') breaches = Math.floor(rand() * 75) + 5;    // 5–80 br
+    if (ragState === 'AMBER') breaches = Math.floor(rand() * 20) + 1;       // 1–20 breaches
+    else if (ragState === 'RED') breaches = Math.floor(rand() * 75) + 5;    // 5–80 breaches
     const failureRate = breaches === 0 ? 0 : parseFloat(((breaches / baseVolume) * 100).toFixed(4));
     const status: KPIRow['status'] = ragState === 'RED' || ragState === 'AMBER' ? 'BREACHED' : 'CLEAN';
 
