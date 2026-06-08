@@ -16,6 +16,7 @@ export type FilterState = {
   stateFlags: StateFlag[];
   ragStates: RagState[];
   severities: Severity[];
+  impacts: ImpactTier[];
   searchQuery: string;
 };
 
