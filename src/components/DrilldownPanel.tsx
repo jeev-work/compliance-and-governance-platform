@@ -715,11 +715,11 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           </div>
         )}
 
-        {/* Comments */}
+        {/* Comments — free-form notes from operators (separate from the ledger-backed Activity Log below) */}
         {row.comments.length > 0 && (
           <div className="px-4 py-3 border-b border-border">
             <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
-              <MessageSquare className="h-3 w-3" /> Activity Log ({row.comments.length})
+              <MessageSquare className="h-3 w-3" /> Comments &amp; Notes ({row.comments.length})
             </h3>
             <div className="space-y-2">
               {row.comments.map((c, i) => (
