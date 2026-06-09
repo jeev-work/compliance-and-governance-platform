@@ -551,7 +551,31 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           )}
         </div>
 
-        {/* Key metrics */}
+        {/* Unconfigured / Connection-lost info card */}
+        {(row.ragState === 'UNCONFIGURED' || row.ragState === 'GREY') && (() => {
+          const lost = CONNECTION_LOST_MAP[row.id];
+          const isUnc = row.ragState === 'UNCONFIGURED';
+          return (
+            <div className={cn(
+              'mx-4 my-3 px-3 py-2.5 rounded border flex items-start gap-2',
+              isUnc ? 'border-dashed border-rag-unconfigured rag-unconfigured' : 'border-rag-grey bg-rag-grey',
+            )}>
+              <Plug className={cn('h-4 w-4 shrink-0 mt-0.5', isUnc ? 'rag-unconfigured' : 'rag-grey')} />
+              <div className="flex-1 text-[11px]">
+                <div className="font-semibold text-foreground">
+                  {isUnc ? 'KPI not yet configured — chase mechanism active' : 'Connection dead — routed to Platform Admin'}
+                </div>
+                <div className="text-muted-foreground mt-0.5">
+                  {lost && <span>Connection lost <span className="text-foreground font-mono">{Math.floor((Date.now() - new Date(lost.lostAt).getTime()) / 60000)}m</span> ago · </span>}
+                  {lost ? <span>Contact <span className="text-foreground font-semibold">{lost.contactPerson}</span> from <span className="text-foreground">{lost.contactOrg}</span> to restore the feed.</span>
+                       : isUnc ? <span>Owner has been notified; escalation will fire after 24h without configuration.</span>
+                       : <span>Telemetry will resume once the upstream connector recovers.</span>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="grid grid-cols-5 gap-2 px-4 py-3 border-b border-border">
           <MiniStat label="Severity" value={row.severity} color={row.severity === 'Critical' ? 'red' : row.severity === 'High' ? 'amber' : 'green'} />
           <MiniStat label="Risk Score" value={String(row.riskScore)} color={row.riskScore >= 70 ? 'red' : row.riskScore >= 40 ? 'amber' : 'green'} />
