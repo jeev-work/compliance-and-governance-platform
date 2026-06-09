@@ -368,18 +368,22 @@ export function generateMockData(count = 30000): KPIRow[] {
     const stateFlags: StateFlag[] = [];
 
     if (status === 'BREACHED') {
-      // Age-aware lifecycle:
-      //   - Any breach older than 8h is force-closed (Resolved) — no stale "Investigating from 3 weeks ago".
-      //   - Fresh breaches (< 8h) get a realistic open distribution.
+      // Lifecycle distribution — biased toward in-flight states so a demo always has
+      // plenty of Open / Investigating / Escalated / Verifying KPIs to drill into.
+      // Older breaches (>16h) skew further toward Resolved but never force-close.
       const ageHrs = (baseDate.getTime() - ts.getTime()) / 3600000;
       const r = rand();
-      if (ageHrs > 8) {
-        resolutionStatus = 'Resolved';
+      if (ageHrs > 16) {
+        resolutionStatus = r < 0.55 ? 'Resolved'
+                         : r < 0.70 ? 'Verifying'
+                         : r < 0.85 ? 'Investigating'
+                         : r < 0.95 ? 'Escalated to HOD'
+                                    : 'Open';
       } else {
-        resolutionStatus = r < 0.30 ? 'Resolved'
-                         : r < 0.55 ? 'Verifying'
-                         : r < 0.78 ? 'Investigating'
-                         : r < 0.92 ? 'Escalated to HOD'
+        resolutionStatus = r < 0.18 ? 'Resolved'
+                         : r < 0.34 ? 'Verifying'
+                         : r < 0.60 ? 'Investigating'
+                         : r < 0.82 ? 'Escalated to HOD'
                                     : 'Open';
       }
       assignee = pick(rand, ASSIGNEES);
