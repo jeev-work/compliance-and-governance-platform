@@ -216,7 +216,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel
 }
 
 function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClose: () => void; onBack: () => void; backLabel?: string }) {
-  const { filters, mutateRow, configSnapshots, registries } = useFilters();
+  const { filters, mutateRow, configSnapshots, registries, addConfigFile, switchKpiConfig } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
   // Dependency toggle modal state
