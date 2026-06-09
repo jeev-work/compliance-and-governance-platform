@@ -103,13 +103,17 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
         <Shield className="h-5 w-5 text-primary shrink-0" />
         <div className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="text-xs font-semibold text-sidebar-accent-foreground">GovShield</div>
-          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Demo Screens · 7</div>
+          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Demo Screens · 8</div>
         </div>
       </div>
 
       <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto scrollbar-thin">
         {SCENARIOS.map((s) => {
-          const isActive = s.wallboard ? activeWallboard : (filters.role === s.role && !activeWallboard);
+          const isActive = s.wallboard
+            ? activeWallboard
+            : s.id === 's8'
+              ? activeLifecycle
+              : (filters.role === s.role && !activeWallboard && !activeLifecycle);
           return (
             <button
               key={s.id}
