@@ -43,8 +43,8 @@ const SCENARIOS: Scenario[] = [
     pick: (rows) => rows.find(r => r.executiveFlag) || rows.find(r => r.ragState === 'RED' && r.severity === 'Critical'),
   },
   {
-    id: 's5', num: 5, label: 'Compliance Auditor', icon: FileCheck,
-    blurb: 'WORM ledger · SHA-256 · export audit',
+    id: 's5', num: 5, label: 'Compliance / Auditor / Analyst', icon: FileCheck,
+    blurb: 'WORM ledger · SLA% trend · SHA-256 export',
     role: 'compliance',
   },
   {

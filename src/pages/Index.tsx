@@ -6,11 +6,11 @@ import { ExecutiveView } from '@/components/views/ExecutiveView';
 import { LobManagerView } from '@/components/views/LobManagerView';
 import { SpocView } from '@/components/views/SpocView';
 import { ComplianceView } from '@/components/views/ComplianceView';
-import { AnalystView } from '@/components/views/AnalystView';
 import { AdminHealthView } from '@/components/views/AdminHealthView';
 import { DrilldownPanel } from '@/components/DrilldownPanel';
 import { KpiHistoryPanel } from '@/components/KpiHistoryPanel';
 import { NotificationPanel } from '@/components/NotificationPanel';
+import { PinnedKpiRail } from '@/components/PinnedKpiRail';
 import { NocWallboard } from '@/components/NocWallboard';
 
 function DashboardContent() {
@@ -25,11 +25,11 @@ function DashboardContent() {
         <main className="flex-1 p-3 overflow-y-auto scrollbar-thin">
           <KpiHistoryPanel />
           <NotificationPanel />
+          <PinnedKpiRail />
           {filters.role === 'executive'  && <ExecutiveView />}
           {filters.role === 'lobManager' && <LobManagerView />}
           {filters.role === 'spoc'       && <SpocView />}
-          {filters.role === 'compliance' && <ComplianceView />}
-          {filters.role === 'analyst'    && <AnalystView />}
+          {(filters.role === 'compliance' || filters.role === 'analyst') && <ComplianceView />}
           {filters.role === 'admin'      && <AdminHealthView />}
         </main>
       </div>
