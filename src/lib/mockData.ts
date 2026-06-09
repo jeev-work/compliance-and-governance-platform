@@ -470,6 +470,15 @@ export function generateMockData(count = 30000): KPIRow[] {
       stateFlags.push('Unconfigured');
     }
 
+    // Once a breach is Resolved, the KPI is healthy again — flip the tile back to GREEN
+    // so the dashboard doesn't show a red/amber tile for a closed incident.
+    if (resolutionStatus === 'Resolved') {
+      ragState = 'GREEN';
+      status = 'CLEAN';
+      breaches = 0;
+      failureRate = 0;
+    }
+
     const versionIdx = Math.floor(rand() * 4);
     const slaVersion = `SLA_v1.${versionIdx}`;
     // Build per-KPI lifetime SLA history — every prior version this KPI ran under.
