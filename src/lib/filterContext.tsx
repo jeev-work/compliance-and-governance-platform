@@ -94,8 +94,10 @@ export function useFilters() {
   return c;
 }
 
-const seedData = generateMockData(1800);
-const BASELINE = new Date(2026, 4, 14);
+const seedData = generateMockData(4200);
+// Anchor BASELINE to "now" so the dashboard always reflects fresh data,
+// matching the `new Date()` anchor used inside generateMockData.
+const BASELINE = new Date();
 
 function presetToCutoff(p: DatePreset): Date {
   const d = new Date(BASELINE.getTime());
