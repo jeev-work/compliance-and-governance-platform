@@ -1357,3 +1357,77 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
     </div>
   );
 }
+
+function ChangeConfigModal({ kpiId, configFiles, onSwitch, onAddFile, onClose }: {
+  kpiId: string;
+  configFiles: { id: string; label: string; description: string; activeRange: string }[];
+  onSwitch: (fileId: string) => void;
+  onAddFile: (file: { id: string; label: string; description: string; activeRange: string }) => void;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<'switch' | 'add'>('switch');
+  const [selected, setSelected] = useState<string>(configFiles[0]?.id ?? '');
+  const [newFile, setNewFile] = useState({ id: '', label: '', description: '', activeRange: '' });
+  return (
+    <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Settings className="h-4 w-4 text-primary" /> Change Configuration · <span className="font-mono">{kpiId}</span>
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="flex items-center gap-1 px-4 pt-2 border-b border-border">
+          {(['switch', 'add'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={cn(
+                'text-[10px] font-semibold px-3 py-1.5 border-b-2 -mb-px',
+                tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}>
+              {t === 'switch' ? 'Switch existing' : 'Add new'}
+            </button>
+          ))}
+        </div>
+        <div className="p-4 space-y-3">
+          {tab === 'switch' && (
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Select configuration profile</label>
+              {configFiles.map(f => (
+                <label key={f.id} className={cn('block p-2 rounded border cursor-pointer text-[10px]',
+                  selected === f.id ? 'border-primary/40 bg-primary/5' : 'border-border bg-secondary/30 hover:bg-accent/30')}>
+                  <div className="flex items-center gap-2">
+                    <input type="radio" checked={selected === f.id} onChange={() => setSelected(f.id)} />
+                    <span className="font-semibold text-foreground">{f.label}</span>
+                    <span className="ml-auto font-mono text-muted-foreground">{f.activeRange}</span>
+                  </div>
+                  <div className="text-muted-foreground mt-0.5 pl-5">{f.description}</div>
+                </label>
+              ))}
+              <button onClick={() => selected && onSwitch(selected)}
+                className="w-full text-[11px] px-3 py-1.5 rounded border bg-primary/15 border-primary/40 text-primary font-semibold hover:bg-primary/25">
+                Switch to selected
+              </button>
+            </div>
+          )}
+          {tab === 'add' && (
+            <div className="space-y-2">
+              <input value={newFile.id} onChange={e => setNewFile({ ...newFile, id: e.target.value })} placeholder="config-id (e.g. summer-2026)"
+                className="w-full h-8 text-xs bg-secondary border border-border rounded px-2" />
+              <input value={newFile.label} onChange={e => setNewFile({ ...newFile, label: e.target.value })} placeholder="Display label"
+                className="w-full h-8 text-xs bg-secondary border border-border rounded px-2" />
+              <input value={newFile.activeRange} onChange={e => setNewFile({ ...newFile, activeRange: e.target.value })} placeholder="Active range"
+                className="w-full h-8 text-xs bg-secondary border border-border rounded px-2" />
+              <textarea value={newFile.description} onChange={e => setNewFile({ ...newFile, description: e.target.value })} placeholder="Description"
+                rows={3} className="w-full text-xs bg-secondary border border-border rounded px-2 py-1" />
+              <button
+                onClick={() => { if (newFile.id && newFile.label) { onAddFile(newFile); setNewFile({ id: '', label: '', description: '', activeRange: '' }); setTab('switch'); } }}
+                className="w-full text-[11px] px-3 py-1.5 rounded border bg-primary/15 border-primary/40 text-primary font-semibold hover:bg-primary/25">
+                Add configuration file
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
