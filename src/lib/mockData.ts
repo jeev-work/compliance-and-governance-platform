@@ -342,8 +342,8 @@ export function generateMockData(count = 30000): KPIRow[] {
     let breaches = 0;
     if (ragState === 'AMBER') breaches = Math.floor(rand() * 20) + 1;       // 1–20 breaches
     else if (ragState === 'RED') breaches = Math.floor(rand() * 75) + 5;    // 5–80 breaches
-    const failureRate = breaches === 0 ? 0 : parseFloat(((breaches / baseVolume) * 100).toFixed(4));
-    const status: KPIRow['status'] = ragState === 'RED' || ragState === 'AMBER' ? 'BREACHED' : 'CLEAN';
+    let failureRate = breaches === 0 ? 0 : parseFloat(((breaches / baseVolume) * 100).toFixed(4));
+    let status: KPIRow['status'] = ragState === 'RED' || ragState === 'AMBER' ? 'BREACHED' : 'CLEAN';
 
     const riskScore = ragState === 'RED' ? Math.min(100, Math.round(40 + failureRate * 20))
                     : ragState === 'AMBER' ? Math.round(20 + failureRate * 10)
