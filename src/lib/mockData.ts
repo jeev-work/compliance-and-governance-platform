@@ -550,7 +550,7 @@ export function generateMockData(count = 30000): KPIRow[] {
       impactTier,
       urgencyScore,
       riskScore,
-      ledgerEntries: makeLedgerFromChase(rand, chaseTimeline, ragState, severity, assignee?.name ?? 'Unassigned', !!dependency, !!executiveFlag),
+      ledgerEntries,
     });
   }
 
