@@ -840,6 +840,9 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           {actions.includes('executiveFlag') && row.executiveFlag && (
             <ActionBtn icon={Flag} label="Un-flag (Exec)" onClick={onUnflag} variant="amber" />
           )}
+          {filters.role === 'admin' && (
+            <ActionBtn icon={Settings} label="Change Config" onClick={() => setConfigModal(true)} />
+          )}
           {actions.length === 0 && filters.role !== 'admin' && (
             <span className="text-[10px] text-muted-foreground italic">No actions in this role · view-only context</span>
           )}
