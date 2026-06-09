@@ -251,8 +251,26 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const appendMaster = useCallback((e: LedgerEntry) => setMasterLedger(prev => [...prev, e]), []);
 
   const mutateRow = useCallback((id: string, patch: Partial<KPIRow>) => {
-    setAllData(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
-    setDrilldown(d => d.row && d.row.id === id ? { ...d, row: { ...d.row, ...patch } as KPIRow } : d);
+    // Centralized invariants — keep RAG / status / breach counts in sync with resolutionStatus
+    // so any code path that resolves a KPI automatically turns the tile green.
+    const normalize = (r: KPIRow): KPIRow => {
+      const res = r.resolutionStatus;
+      if (res === 'Resolved' || res === 'Clean') {
+        return {
+          ...r,
+          status: 'CLEAN',
+          ragState: r.ragState === 'BLUE' || r.ragState === 'UNCONFIGURED' ? r.ragState : 'GREEN',
+          breaches: 0,
+          failureRate: 0,
+          severity: r.severity && res === 'Resolved' ? 'Low' : r.severity,
+          riskScore: 0,
+          stateFlags: r.stateFlags.filter(f => f !== 'Unacknowledged' && f !== 'Verifying' && f !== 'Escalated'),
+        };
+      }
+      return r;
+    };
+    setAllData(prev => prev.map(r => r.id === id ? normalize({ ...r, ...patch }) : r));
+    setDrilldown(d => d.row && d.row.id === id ? { ...d, row: normalize({ ...d.row, ...patch } as KPIRow) } : d);
   }, []);
 
   const addLob = useCallback((name: string, actor: string, meta?: Partial<LobMeta>) => {
