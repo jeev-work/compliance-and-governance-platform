@@ -93,6 +93,11 @@ export function GlobalFilterBar() {
     return buildSuggestions(q, allData, registries.lobs, registries.systems, registries.processes).map(s => ({ kind: 'sug' as const, s }));
   };
 
+  const breachCount = filteredData.filter(r => r.status === 'BREACHED').length;
+  const greyCount = filteredData.filter(r => r.ragState === 'GREY').length;
+
+
+
 
   return (
     <div className="border-b border-border bg-card px-3 py-2 flex items-center gap-2 flex-wrap">
