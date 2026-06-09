@@ -263,16 +263,16 @@ function makeLedgerFromChase(
 
 /** Per-system color bias so the System Health card looks realistically mixed instead of all-RED. */
 const SYSTEM_BIAS: Record<string, { green: number; amber: number; red: number; grey: number; blue: number }> = {
-  'Core Banking':    { green: 0.94, amber: 0.04, red: 0.005, grey: 0.005, blue: 0.008 },
-  'Payment Gateway': { green: 0.90, amber: 0.06, red: 0.02,  grey: 0.015, blue: 0.003 },
-  'CRM':             { green: 0.95, amber: 0.04, red: 0.005, grey: 0.003, blue: 0.000 },
-  'Document Cloud':  { green: 0.84, amber: 0.12, red: 0.03,  grey: 0.005, blue: 0.003 },
-  'Data Warehouse':  { green: 0.74, amber: 0.15, red: 0.09,  grey: 0.010, blue: 0.005 },
-  'Auth Engine':     { green: 0.96, amber: 0.03, red: 0.005, grey: 0.003, blue: 0.000 },
+  'Core Banking':    { green: 0.82, amber: 0.10, red: 0.04,  grey: 0.012, blue: 0.018 },
+  'Payment Gateway': { green: 0.70, amber: 0.16, red: 0.10,  grey: 0.025, blue: 0.005 },
+  'CRM':             { green: 0.86, amber: 0.09, red: 0.030, grey: 0.010, blue: 0.005 },
+  'Document Cloud':  { green: 0.66, amber: 0.20, red: 0.105, grey: 0.020, blue: 0.005 },
+  'Data Warehouse':  { green: 0.55, amber: 0.22, red: 0.18,  grey: 0.030, blue: 0.010 },
+  'Auth Engine':     { green: 0.88, amber: 0.08, red: 0.025, grey: 0.010, blue: 0.005 },
 };
 
 /** Per-LoB stress multiplier on amber/red. Keeps B2C healthy, B2B mixed, Wheels the hot zone. */
-const LOB_BIAS: Record<string, number> = { B2C: 0.35, B2B: 1.0, Wheels: 2.4 };
+const LOB_BIAS: Record<string, number> = { B2C: 0.6, B2B: 1.2, Wheels: 2.6 };
 
 /** Per-process realistic daily volume bands (min, max). */
 const PROCESS_VOLUME: Record<string, [number, number]> = {
