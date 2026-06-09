@@ -87,9 +87,12 @@ export function GlobalFilterBar() {
   };
   const clearArr = (key: 'lobs' | 'systems' | 'processes' | 'stateFlags' | 'ragStates' | 'severities' | 'impacts') =>
     setFilters(f => ({ ...f, [key]: [] }));
+  const buildSuggestionsList = (): Array<{ kind: 'sug'; s: ReturnType<typeof buildSuggestions>[number] } | { kind: 'rec'; r: RecentEntry }> => {
+    const q = filters.searchQuery.trim();
+    if (!q) return recents.slice(0, 6).map(r => ({ kind: 'rec' as const, r }));
+    return buildSuggestions(q, allData, registries.lobs, registries.systems, registries.processes).map(s => ({ kind: 'sug' as const, s }));
+  };
 
-  const breachCount = filteredData.filter(r => r.status === 'BREACHED').length;
-  const greyCount = filteredData.filter(r => r.ragState === 'GREY').length;
 
   return (
     <div className="border-b border-border bg-card px-3 py-2 flex items-center gap-2 flex-wrap">
