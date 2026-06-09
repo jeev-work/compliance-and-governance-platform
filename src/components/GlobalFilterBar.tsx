@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Info, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GlobalSearchSuggest, useRecents, buildSuggestions, type SuggestionPick, type RecentEntry } from './GlobalSearchSuggest';
 
 const PRESETS: DatePreset[] = ['1H', '24H', '7D', '30D', '60D', '90D'];
