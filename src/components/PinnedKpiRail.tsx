@@ -55,7 +55,7 @@ export function PinnedKpiRail() {
   const [pins, toggle] = usePinned(filters.role);
 
   const pinnedRows = useMemo(
-    () => pins.map(id => allData.find(r => r.id === id)).filter(Boolean) as ReturnType<typeof allData['find']> extends infer T ? NonNullable<T>[] : never,
+    () => pins.map(id => allData.find(r => r.id === id)).filter((r): r is NonNullable<typeof r> => !!r),
     [pins, allData],
   );
 
