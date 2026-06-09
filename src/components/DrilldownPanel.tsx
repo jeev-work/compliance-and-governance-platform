@@ -235,6 +235,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
   }>(null);
 
   // Resolve confirmation modal — captures a comment + media before closing.
+  const [configModal, setConfigModal] = useState(false);
   const [resolveModal, setResolveModal] = useState<null | {
     mode: 'standard' | 'cascade'; comment: string; attachments: string[];
   }>(null);
