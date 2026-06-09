@@ -16,7 +16,7 @@ const RAG_HSL: Record<RagState, string> = {
 };
 
 export function ExecutiveView() {
-  const { filteredData, openDrilldown } = useFilters();
+  const { filteredData, openDrilldown, filters, setFilters } = useFilters();
 
   const ragDist = useMemo(() => {
     const counts: Record<RagState, number> = { GREEN: 0, AMBER: 0, RED: 0, GREY: 0, BLUE: 0, UNCONFIGURED: 0 };
@@ -81,8 +81,49 @@ export function ExecutiveView() {
     return Array.from(m.entries()).map(([name, d]) => ({ name, ...d })).sort((a, b) => b.breaches - a.breaches);
   }, [filteredData]);
 
+  /* Severity bucket counts across breached rows */
+  const sevBuckets = useMemo(() => {
+    const b: Record<Severity, number> = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    filteredData.forEach(r => { if (r.status === 'BREACHED') b[r.severity]++; });
+    return b;
+  }, [filteredData]);
+
+  /* System × Hour heatmap data */
+  const heatmap = useMemo(() => {
+    const systems = Array.from(new Set(filteredData.map(r => r.system)));
+    return systems.map(sys => {
+      const rows = filteredData.filter(r => r.system === sys);
+      const hourly = aggregateHourly(rows);
+      const peaks = peakWindows(hourly, 1);
+      return { system: sys, hourly, peak: peaks[0] ?? null, max: Math.max(...hourly) };
+    });
+  }, [filteredData]);
+
   return (
     <div className="space-y-3">
+      {/* Severity summary strip */}
+      <div className="grid grid-cols-4 gap-2">
+        {(['Critical', 'High', 'Medium', 'Low'] as Severity[]).map(s => (
+          <button
+            key={s}
+            onClick={() => setFilters(f => ({ ...f, severities: f.severities.includes(s) ? f.severities.filter(x => x !== s) : [s] }))}
+            className={cn(
+              'rounded-md px-3 py-2 border text-left transition-all',
+              s === 'Critical' ? 'bg-rag-red border-rag-red' :
+              s === 'High'     ? 'bg-rag-amber border-rag-amber' :
+              s === 'Medium'   ? 'border-border bg-secondary/40' : 'border-border bg-secondary/20',
+              filters.severities.includes(s) && 'ring-1 ring-primary',
+            )}
+          >
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s} breaches</div>
+            <div className={cn('text-lg font-semibold font-mono',
+              s === 'Critical' ? 'rag-red' : s === 'High' ? 'rag-amber' : 'text-foreground')}>
+              {sevBuckets[s]}
+            </div>
+          </button>
+        ))}
+      </div>
+
       {/* Executive Flag banner */}
       {metrics.execFlagged > 0 && (
         <div className="bg-rag-red border border-rag-red rounded-md px-3 py-2 flex items-center gap-2 exec-pulse">
