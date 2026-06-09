@@ -9,7 +9,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Info, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { GlobalSearchSuggest, useRecents, buildSuggestions, type SuggestionPick, type RecentEntry } from './GlobalSearchSuggest';
 
 const PRESETS: DatePreset[] = ['1H', '24H', '7D', '30D', '60D', '90D'];
 
@@ -23,8 +24,57 @@ const RAG_COLORS: Record<RagState, string> = {
 };
 
 export function GlobalFilterBar() {
-  const { filters, setFilters, filteredData } = useFilters();
+  const { filters, setFilters, filteredData, allData, registries, openDrilldown } = useFilters();
   const [customOpen, setCustomOpen] = useState(false);
+  const { recents, push: pushRecent, remove: removeRecent, clearAll: clearAllRecents } = useRecents();
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [itemCount, setItemCount] = useState(0);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close suggest on outside click
+  useEffect(() => {
+    if (!searchFocused) return;
+    const onDown = (e: MouseEvent) => {
+      if (!searchWrapRef.current?.contains(e.target as Node)) setSearchFocused(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [searchFocused]);
+
+  useEffect(() => { setActiveIndex(-1); }, [filters.searchQuery]);
+
+  const commitPick = (s: SuggestionPick) => {
+    setFilters(f => ({ ...f, searchQuery: s.query }));
+    pushRecent({ q: s.query, kpiId: s.kind === 'kpi' ? s.label : undefined });
+    if (s.kind === 'kpi') openDrilldown('breach', s.row.id, s.row);
+    setSearchFocused(false);
+    inputRef.current?.blur();
+  };
+  const commitRecent = (r: RecentEntry) => {
+    setFilters(f => ({ ...f, searchQuery: r.q }));
+    pushRecent({ q: r.q, kpiId: r.kpiId });
+    if (r.kpiId) {
+      const row = allData.find(x => x.id === r.kpiId);
+      if (row) openDrilldown('breach', row.id, row);
+    }
+    setSearchFocused(false);
+    inputRef.current?.blur();
+  };
+
+  const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') { setSearchFocused(false); inputRef.current?.blur(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex(i => Math.min(i + 1, itemCount - 1)); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex(i => Math.max(i - 1, 0)); return; }
+    if (e.key === 'Enter') {
+      // delegate to suggest panel via synthetic click — handled by useEffect not possible; replicate logic here
+      const q = filters.searchQuery.trim();
+      if (q) pushRecent({ q });
+      setSearchFocused(false);
+      inputRef.current?.blur();
+    }
+  };
 
   const toggleArr = <K extends 'lobs' | 'systems' | 'processes' | 'stateFlags' | 'ragStates' | 'severities' | 'impacts'>(
     key: K, value: string,
@@ -37,20 +87,43 @@ export function GlobalFilterBar() {
   };
   const clearArr = (key: 'lobs' | 'systems' | 'processes' | 'stateFlags' | 'ragStates' | 'severities' | 'impacts') =>
     setFilters(f => ({ ...f, [key]: [] }));
+  const buildSuggestionsList = (): Array<{ kind: 'sug'; s: ReturnType<typeof buildSuggestions>[number] } | { kind: 'rec'; r: RecentEntry }> => {
+    const q = filters.searchQuery.trim();
+    if (!q) return recents.slice(0, 6).map(r => ({ kind: 'rec' as const, r }));
+    return buildSuggestions(q, allData, registries.lobs, registries.systems, registries.processes).map(s => ({ kind: 'sug' as const, s }));
+  };
 
   const breachCount = filteredData.filter(r => r.status === 'BREACHED').length;
   const greyCount = filteredData.filter(r => r.ragState === 'GREY').length;
 
+
+
+
   return (
     <div className="border-b border-border bg-card px-3 py-2 flex items-center gap-2 flex-wrap">
       {/* Global search */}
-      <div className="relative">
+      <div className="relative" ref={searchWrapRef}>
         <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <input
+          ref={inputRef}
           value={filters.searchQuery}
           onChange={(e) => setFilters(f => ({ ...f, searchQuery: e.target.value }))}
-          placeholder="Search KPI, system, LoB, assignee, hash…"
-          className="h-7 w-[240px] text-xs bg-secondary border border-border rounded pl-7 pr-6 focus:outline-none focus:border-primary/50"
+          onFocus={() => setSearchFocused(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && activeIndex >= 0) {
+              const items = buildSuggestionsList();
+              const it = items[activeIndex];
+              if (it) {
+                e.preventDefault();
+                if (it.kind === 'sug') commitPick(it.s);
+                else commitRecent(it.r);
+                return;
+              }
+            }
+            onSearchKey(e);
+          }}
+          placeholder="Search KPI id (e.g. 108), system, LoB, person…"
+          className="h-7 w-[260px] text-xs bg-secondary border border-border rounded pl-7 pr-6 focus:outline-none focus:border-primary/50"
         />
         {filters.searchQuery && (
           <button
@@ -60,6 +133,23 @@ export function GlobalFilterBar() {
           >
             <X className="h-3 w-3 text-muted-foreground" />
           </button>
+        )}
+        {searchFocused && (
+          <GlobalSearchSuggest
+            query={filters.searchQuery}
+            rows={allData}
+            lobs={registries.lobs}
+            systems={registries.systems}
+            processes={registries.processes}
+            recents={recents}
+            onPick={commitPick}
+            onPickRecent={commitRecent}
+            onRemoveRecent={removeRecent}
+            onClearAll={clearAllRecents}
+            activeIndex={activeIndex}
+            setActiveIndex={setActiveIndex}
+            registerItems={setItemCount}
+          />
         )}
       </div>
 
