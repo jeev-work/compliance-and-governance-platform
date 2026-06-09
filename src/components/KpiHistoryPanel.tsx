@@ -19,11 +19,10 @@ const RAG_CLR: Record<RagState, string> = {
 };
 
 export function KpiHistoryPanel() {
-  const { historyView, filters, setFilters, openDrilldown } = useFilters();
+  const { historyView, setFilters, openDrilldown } = useFilters();
   if (!historyView) return null;
 
   const { pivot, rows } = historyView;
-  const isAnalyst = filters.role === 'analyst';
   const spoc = SYSTEM_SPOC_MAP[pivot.system] ?? {
     name: pivot.assignee?.name ?? 'Unassigned', role: 'System SPOC',
     email: 'spoc@gov.demo', phone: '+1-555-0100', teams: '@spoc',
@@ -53,16 +52,9 @@ export function KpiHistoryPanel() {
         </button>
       </div>
 
-      {/* Performance strip (always shown) */}
       <PerformanceStrip rows={rows} />
-
-      {/* SPOC contact card */}
-      <SpocContactCard spoc={spoc} isAnalyst={isAnalyst} pivotId={pivot.id} />
-
-      {/* Malfunction history — hidden for analyst */}
-      {!isAnalyst && (
-        <MalfunctionHistory rows={rows} openLatest={(r) => openDrilldown('breach', r.id, r)} />
-      )}
+      <SpocContactCard spoc={spoc} isAnalyst={false} pivotId={pivot.id} />
+      <MalfunctionHistory rows={rows} openLatest={(r) => openDrilldown('breach', r.id, r)} />
     </div>
   );
 }

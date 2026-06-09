@@ -30,7 +30,7 @@ const ROLE_META: Record<string, { title: string; subtitle: string }> = {
   lobManager: { title: 'LoB Manager Notifications',   subtitle: 'Unacknowledged, overdue & cross-functional items in scope' },
   spoc:       { title: 'IT SPOC Notifications',       subtitle: 'Tickets needing acknowledgement or resolution' },
   compliance: { title: 'Compliance Notifications',    subtitle: 'Ledger sign-offs pending & data-integrity (GREY) events' },
-  analyst:    { title: 'Analyst Notifications',       subtitle: 'KPIs with highest breach concentration this window' },
+  
   admin:      { title: 'Admin Notifications',         subtitle: 'Connector outages, verification-pending & recent ledger writes' },
 };
 
@@ -98,15 +98,6 @@ export function NotificationPanel() {
           } else if (r.ragState === 'GREY') {
             list.push({ id: `grey-${r.id}`, icon: Database, tone: 'grey', reason: 'Data integrity · GREY state', row: r });
           }
-        });
-        break;
-      }
-      case 'analyst': {
-        const ranked = [...filteredData]
-          .filter(r => r.breaches > 0)
-          .sort((a, b) => b.breaches - a.breaches);
-        ranked.forEach(r => {
-          list.push({ id: `trend-${r.id}`, icon: TrendingUp, tone: r.ragState === 'RED' ? 'red' : 'amber', reason: `${r.breaches} breaches · ${r.failureRate.toFixed(2)}% fail`, row: r });
         });
         break;
       }
