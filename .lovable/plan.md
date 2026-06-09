@@ -1,39 +1,40 @@
-## Goal
-Make the top search bar in `GlobalFilterBar.tsx` proactive: as the user types, a dropdown shows matching KPIs, systems, LoBs, processes, and assignees (e.g. typing `108` surfaces `KPI-10817`, `KPI-10842`, …). When the input is empty/focused, show recent searches.
+# Plan
 
-## Behaviour
-- **Dropdown opens** when the input is focused AND either has a query or has stored recents.
-- **Empty query (focused):** show "Recent" section (up to 6 entries, most-recent-first, deduped).
-- **Non-empty query:** show grouped suggestions, max ~8 total, ordered by group:
-  1. **KPI** (id match — `KPI-108…` style; show id · system · resolutionStatus · RAG dot)
-  2. **System / LoB / Process / Source** (registry/value match)
-  3. **People** (assignee names)
-  4. **Hash** (audit ledger hash prefix)
-- Each row has a small left icon hinting the type and a faint right-aligned tag (KPI / System / LoB / Person / Hash).
-- Matching is case-insensitive substring; KPI numeric shortcuts auto-prefix `kpi-` when user types digits only.
-- **Keyboard:** ↑ / ↓ to move, Enter to commit (sets `searchQuery` and, for KPI rows, opens the drilldown), Esc closes.
-- **Mouse:** click commits the same way.
-- **Recents:** persisted in `localStorage` under `globalSearch.recents` (max 10). A recent stores the raw query string + optional `kpiId` if it was a KPI selection. Each recent row has an `×` to remove it; a "Clear recents" footer link clears all.
-- Dropdown closes on outside click or Esc; selecting a KPI also closes it.
+## 1. Remove the Generic Viewer / Analyst role
 
-## Files touched
-- **New:** `src/components/GlobalSearchSuggest.tsx` — the dropdown panel + keyboard logic. Receives `query`, `recents`, `onPick`, `onClearRecent`, `onClearAll`, `activeIndex`, `setActiveIndex`. Pure presentational + small hook for outside-click.
-- **Edit:** `src/components/GlobalFilterBar.tsx` — wrap the existing input in a relatively-positioned container, add focus/blur state, mount `<GlobalSearchSuggest />` below the input, wire keyboard handlers on the input. Replace the static placeholder hint to mention "type KPI id, system, LoB…".
-- **Edit:** `src/lib/filterContext.tsx` — expose `openDrilldown` is already available; no schema changes. Add a tiny helper `findKpiById(id)` exported from context (or compute inline in `GlobalSearchSuggest` using `allData` already exposed via `useFilters`).
+The `analyst` role is a duplicate of `compliance` in practice — `ComplianceView` is rendered for both, and there are no analyst-only actions in `rbac.ts`. We'll delete it everywhere.
 
-## Suggestion source (no new data)
-Use what `useFilters()` already exposes:
-- `allData` → KPI rows (id, system, lob, process, assignee, auditLedgerId)
-- `registries` → lobs, systems, processes
-- Distinct assignee names derived from `allData` (memoized)
+- **`src/lib/filterContext.tsx`** — remove `'analyst'` from the `Role` union.
+- **`src/lib/rbac.ts`** — drop the `analyst` entries from `ROLE_ACTIONS`, `ROLE_LABEL`, `ROLE_PURPOSE`.
+- **`src/pages/Index.tsx`** — change the gate to just `filters.role === 'compliance'`.
+- **`src/components/NotificationPanel.tsx`** — drop the `analyst` notification preset and its `case 'analyst'` branch (compliance preset continues to cover this audience).
+- **`src/components/KpiHistoryPanel.tsx`** — remove the `isAnalyst` branch (history is always shown).
+- **`src/components/views/ComplianceView.tsx`** — local `analystOpen` UI state stays (it's just a section toggle name); no role check needed. We'll leave it as-is unless cleanup is requested.
 
-## Edge cases
-- Numeric-only input like `108` → treat as KPI prefix; show KPIs whose id contains `108`.
-- No matches → show single muted row "No matches for "<q>"" plus recents below.
-- Recent that references a now-missing KPI → still selectable as a text search; if KPI exists, opening the drilldown takes priority.
-- Long lists are capped (8 suggestions / 6 recents) to keep the panel compact and consistent with the existing dense bar.
+## 2. Rename "Compliance & Audit" → "Compliance, Audit, Analyst"
+
+- **`src/lib/rbac.ts`** — `ROLE_LABEL.compliance = 'Compliance, Audit, Analyst'`. Update `ROLE_PURPOSE.compliance` to mention the merged analyst audience (e.g. "Immutable ledger query · hashed regulatory export · historical SLA trends").
+- **`src/components/AppSidebar.tsx`** — update the Screen 5 label/blurb to "Compliance, Audit, Analyst".
+
+## 3. New sidebar entry: "KPI Lifecycle"
+
+Add an 8th item in `AppSidebar.tsx` that opens a dedicated full-screen view walking through the complete lifecycle of a single KPI: **Configured → Monitored → Breached → Acknowledged → RCA → Resolution Deployed → Verifying → Resolved → Back to Green** (plus optional Executive Flag and Audit Export side-rails).
+
+### Behavior
+- Sidebar click sets a new `lifecycleOpen` boolean (lifted state in `Index.tsx`, same pattern as `wallboardOpen`). When open, main content is replaced by `<KpiLifecycleView />`; sidebar item is highlighted.
+- The view picks a representative KPI by default: the first one with `resolutionStatus === 'Resolved'` and a populated ack/RCA/resolve history, so all stages render. A small KPI picker (search/select) lets the user choose any KPI.
+- Renders a horizontal stage timeline with:
+  - Stage label, timestamp from the row's event history, actor, and the resulting RAG colour at that moment.
+  - The active stage is highlighted; future stages are dimmed.
+  - Each stage card shows the relevant artifacts already in the data model (ack note, RCA snippet, deployed-resolution hash, verification timer, ledger entry hash).
+- Below the timeline: a "Rules that govern this lifecycle" panel summarising the auto-revert-to-GREEN rules implemented earlier in `filterContext.tsx` (resolution + cool-down + executive-flag clear), so the demo narrates the logic.
+
+### Files
+- **Create `src/components/views/KpiLifecycleView.tsx`** — pure presentation, reads `useFilters()` for `allData`, accepts a `kpiId` query-like local state.
+- **Edit `src/components/AppSidebar.tsx`** — add the 8th scenario object (`id: 's8'`, icon: `Workflow` from lucide-react, num: 8, label: "KPI Lifecycle", blurb: "Configured → Resolved → Green · full timeline"), plus an `onLaunchLifecycle` prop and `activeLifecycle` highlight, mirroring the wallboard pattern.
+- **Edit `src/pages/Index.tsx`** — add `lifecycleOpen` state, wire the prop, render `<KpiLifecycleView />` in place of the role views when open.
 
 ## Out of scope
-- Fuzzy ranking beyond substring + group order.
-- Server-side search or analytics on search usage.
-- Changing the existing `searchQuery` filtering pipeline in `filterContext` — suggestions are an additive layer.
+- No changes to mock data, ledger logic, or auto-revert-to-GREEN rules — the lifecycle view only visualises existing state.
+- No new persistence; KPI picker state lives in component memory.
+- No edits to `ComplianceView.tsx` beyond what's required (its internal "Analyst" section toggle stays — it's a UI section, not the role).
