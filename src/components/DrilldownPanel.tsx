@@ -500,7 +500,10 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+          <div className="flex items-center gap-1">
+            <PinButton kpiId={row.id} />
+            <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+          </div>
         </div>
 
         {/* RAG strip + SLA Version + Severity = Impact × Urgency */}
