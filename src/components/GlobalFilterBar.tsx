@@ -24,8 +24,57 @@ const RAG_COLORS: Record<RagState, string> = {
 };
 
 export function GlobalFilterBar() {
-  const { filters, setFilters, filteredData } = useFilters();
+  const { filters, setFilters, filteredData, allData, registries, openDrilldown } = useFilters();
   const [customOpen, setCustomOpen] = useState(false);
+  const { recents, push: pushRecent, remove: removeRecent, clearAll: clearAllRecents } = useRecents();
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [itemCount, setItemCount] = useState(0);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close suggest on outside click
+  useEffect(() => {
+    if (!searchFocused) return;
+    const onDown = (e: MouseEvent) => {
+      if (!searchWrapRef.current?.contains(e.target as Node)) setSearchFocused(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [searchFocused]);
+
+  useEffect(() => { setActiveIndex(-1); }, [filters.searchQuery]);
+
+  const commitPick = (s: SuggestionPick) => {
+    setFilters(f => ({ ...f, searchQuery: s.query }));
+    pushRecent({ q: s.query, kpiId: s.kind === 'kpi' ? s.label : undefined });
+    if (s.kind === 'kpi') openDrilldown('breach', s.row.id, s.row);
+    setSearchFocused(false);
+    inputRef.current?.blur();
+  };
+  const commitRecent = (r: RecentEntry) => {
+    setFilters(f => ({ ...f, searchQuery: r.q }));
+    pushRecent({ q: r.q, kpiId: r.kpiId });
+    if (r.kpiId) {
+      const row = allData.find(x => x.id === r.kpiId);
+      if (row) openDrilldown('breach', row.id, row);
+    }
+    setSearchFocused(false);
+    inputRef.current?.blur();
+  };
+
+  const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') { setSearchFocused(false); inputRef.current?.blur(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex(i => Math.min(i + 1, itemCount - 1)); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex(i => Math.max(i - 1, 0)); return; }
+    if (e.key === 'Enter') {
+      // delegate to suggest panel via synthetic click — handled by useEffect not possible; replicate logic here
+      const q = filters.searchQuery.trim();
+      if (q) pushRecent({ q });
+      setSearchFocused(false);
+      inputRef.current?.blur();
+    }
+  };
 
   const toggleArr = <K extends 'lobs' | 'systems' | 'processes' | 'stateFlags' | 'ragStates' | 'severities' | 'impacts'>(
     key: K, value: string,
