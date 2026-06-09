@@ -94,13 +94,28 @@ export function GlobalFilterBar() {
   return (
     <div className="border-b border-border bg-card px-3 py-2 flex items-center gap-2 flex-wrap">
       {/* Global search */}
-      <div className="relative">
+      <div className="relative" ref={searchWrapRef}>
         <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <input
+          ref={inputRef}
           value={filters.searchQuery}
           onChange={(e) => setFilters(f => ({ ...f, searchQuery: e.target.value }))}
-          placeholder="Search KPI, system, LoB, assignee, hash…"
-          className="h-7 w-[240px] text-xs bg-secondary border border-border rounded pl-7 pr-6 focus:outline-none focus:border-primary/50"
+          onFocus={() => setSearchFocused(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && activeIndex >= 0) {
+              const items = buildSuggestionsList();
+              const it = items[activeIndex];
+              if (it) {
+                e.preventDefault();
+                if (it.kind === 'sug') commitPick(it.s);
+                else commitRecent(it.r);
+                return;
+              }
+            }
+            onSearchKey(e);
+          }}
+          placeholder="Search KPI id (e.g. 108), system, LoB, person…"
+          className="h-7 w-[260px] text-xs bg-secondary border border-border rounded pl-7 pr-6 focus:outline-none focus:border-primary/50"
         />
         {filters.searchQuery && (
           <button
@@ -110,6 +125,23 @@ export function GlobalFilterBar() {
           >
             <X className="h-3 w-3 text-muted-foreground" />
           </button>
+        )}
+        {searchFocused && (
+          <GlobalSearchSuggest
+            query={filters.searchQuery}
+            rows={allData}
+            lobs={registries.lobs}
+            systems={registries.systems}
+            processes={registries.processes}
+            recents={recents}
+            onPick={commitPick}
+            onPickRecent={commitRecent}
+            onRemoveRecent={removeRecent}
+            onClearAll={clearAllRecents}
+            activeIndex={activeIndex}
+            setActiveIndex={setActiveIndex}
+            registerItems={setItemCount}
+          />
         )}
       </div>
 
