@@ -17,7 +17,7 @@ type Group =
   | { type: 'recents'; items: RecentEntry[] }
   | { type: 'suggestions'; items: Suggestion[] };
 
-type Suggestion = SuggestionPick & { sub?: string; rag?: KPIRow['ragState'] };
+export type Suggestion = SuggestionPick & { sub?: string; rag?: KPIRow['ragState'] };
 
 function loadRecents(): RecentEntry[] {
   try {
