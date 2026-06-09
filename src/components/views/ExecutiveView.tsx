@@ -241,6 +241,44 @@ export function ExecutiveView() {
           </div>
         </div>
       </div>
+
+      {/* System × Hour heatmap — when do systems crash? */}
+      <div className="bg-card border border-border rounded-md p-3">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Flame className="h-3 w-3" /> System × Hour Breach Heatmap (UTC) · click a system row to drilldown
+        </h3>
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="text-[9px]">
+            <thead>
+              <tr>
+                <th className="text-left pr-2 py-1 font-medium text-muted-foreground min-w-[110px]">System</th>
+                {Array.from({ length: 24 }, (_, h) => (
+                  <th key={h} className="px-0 py-1 font-mono text-muted-foreground text-center w-[22px]">{String(h).padStart(2, '0')}</th>
+                ))}
+                <th className="pl-2 py-1 font-medium text-muted-foreground text-left min-w-[150px]">Worst window</th>
+              </tr>
+            </thead>
+            <tbody>
+              {heatmap.map(h => (
+                <tr key={h.system} onClick={() => openDrilldown('system', h.system)} className="cursor-pointer hover:bg-accent/30">
+                  <td className="pr-2 py-1 font-semibold text-foreground">{h.system}</td>
+                  {h.hourly.map((v, hi) => {
+                    const intensity = h.max > 0 ? v / h.max : 0;
+                    const bg = intensity === 0 ? 'transparent' :
+                      intensity > 0.7 ? 'hsl(0 72% 51% / 0.85)' :
+                      intensity > 0.4 ? 'hsl(0 72% 51% / 0.55)' :
+                      intensity > 0.2 ? 'hsl(38 92% 50% / 0.55)' : 'hsl(38 92% 50% / 0.25)';
+                    return <td key={hi} className="text-center" style={{ background: bg, color: intensity > 0.4 ? 'white' : 'hsl(215 15% 60%)' }}>{v > 0 ? v : ''}</td>;
+                  })}
+                  <td className="pl-2 py-1 text-muted-foreground">
+                    {h.peak ? <span><span className="rag-red font-semibold">{h.peak.label}</span> · {h.peak.count}</span> : <span className="italic">no breaches</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
