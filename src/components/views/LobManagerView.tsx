@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { cn, escalationCountdown } from '@/lib/utils';
-import { Users, AlertCircle, ArrowUpRight, GitFork, Clock, Flag } from 'lucide-react';
+import { Users, AlertCircle, ArrowUpRight, GitFork, Clock, Flag, History } from 'lucide-react';
 import { RagState, RAG_SHORT, getContactPhone } from '@/lib/mockData';
+import { DUMMY_ESCALATION_TRAILS } from '@/lib/extraData';
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green border-rag-green',
@@ -97,7 +98,7 @@ export function LobManagerView() {
                             w === 'GREY' ? 'rag-grey' : w === 'BLUE' ? 'rag-blue' : 'rag-green')}>
                             {RAG_SHORT[w]}
                           </div>
-                          <div className="text-muted-foreground text-[9px]">{c.breaches > 0 ? `${c.breaches} br.` : '—'}</div>
+                          <div className="text-muted-foreground text-[9px]">{c.breaches > 0 ? `${c.breaches} breaches` : '—'}</div>
                         </div>
                       </td>
                     );
