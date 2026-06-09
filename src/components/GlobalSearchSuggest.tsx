@@ -79,7 +79,7 @@ function tagFor(kind: SuggestionPick['kind']) {
     : kind === 'hash' ? 'Hash' : '';
 }
 
-function buildSuggestions(
+export function buildSuggestions(
   query: string,
   rows: KPIRow[],
   lobs: string[],
@@ -88,7 +88,6 @@ function buildSuggestions(
 ): Suggestion[] {
   let q = query.trim().toLowerCase();
   if (!q) return [];
-  // Numeric-only → treat as KPI id fragment
   if (/^\d+$/.test(q)) q = `kpi-${q}`.toLowerCase();
 
   const out: Suggestion[] = [];
@@ -100,7 +99,6 @@ function buildSuggestions(
     out.push(s);
   };
 
-  // KPIs (id match preferred, then text)
   const kpiMatches = rows.filter(r => r.id.toLowerCase().includes(q));
   for (const r of kpiMatches.slice(0, 6)) {
     push({
@@ -108,31 +106,24 @@ function buildSuggestions(
       sub: `${r.system} · ${r.resolutionStatus}`, rag: r.ragState,
     });
   }
-
-  // Systems
   for (const s of systems.filter(x => x.toLowerCase().includes(q)).slice(0, 4)) {
     push({ kind: 'system', label: s, query: s });
   }
-  // LoBs
   for (const l of lobs.filter(x => x.toLowerCase().includes(q)).slice(0, 4)) {
     push({ kind: 'lob', label: l, query: l });
   }
-  // Processes
   for (const p of processes.filter(x => x.toLowerCase().includes(q)).slice(0, 3)) {
     push({ kind: 'process', label: p, query: p });
   }
-  // People (assignees)
   const people = new Set<string>();
   for (const r of rows) if (r.assignee?.name) people.add(r.assignee.name);
   for (const n of Array.from(people).filter(x => x.toLowerCase().includes(q)).slice(0, 3)) {
     push({ kind: 'person', label: n, query: n });
   }
-  // Hash prefix
   if (q.length >= 4) {
     const hashRow = rows.find(r => r.auditLedgerId.toLowerCase().includes(q));
     if (hashRow) push({ kind: 'hash', label: hashRow.auditLedgerId, query: hashRow.auditLedgerId, sub: hashRow.id });
   }
-
   return out.slice(0, MAX_SUGGESTIONS);
 }
 
