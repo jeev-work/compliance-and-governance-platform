@@ -1214,6 +1214,17 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           </div>
         </div>
       )}
+
+      {/* Admin Change-Config modal: switch existing or add new config file */}
+      {configModal && (
+        <ChangeConfigModal
+          kpiId={row.id}
+          configFiles={registries.configFiles}
+          onSwitch={(fid) => { switchKpiConfig(row.id, fid, 'Admin · You'); toast.success(`Config switched → ${fid}`); setConfigModal(false); }}
+          onAddFile={(file) => { addConfigFile(file, 'Admin · You'); toast.success(`Config file added · ${file.label}`); }}
+          onClose={() => setConfigModal(false)}
+        />
+      )}
     </div>
   );
 }
