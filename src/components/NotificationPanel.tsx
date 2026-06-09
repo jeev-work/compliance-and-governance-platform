@@ -4,7 +4,7 @@ import { cn, escalationCountdown } from '@/lib/utils';
 import { KPIRow, getContactPhone } from '@/lib/mockData';
 import {
   Bell, ChevronDown, ChevronUp, AlertTriangle, Flag, GitFork,
-  ShieldAlert, Activity, ClipboardCheck, TrendingUp, Database, CheckCircle2,
+  ShieldAlert, Activity, ClipboardCheck, Database, CheckCircle2,
 } from 'lucide-react';
 
 type NotifTone = 'red' | 'amber' | 'blue' | 'grey' | 'green';
