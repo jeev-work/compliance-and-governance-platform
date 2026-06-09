@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { cn, CHART_TOOLTIP } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Cell, PieChart, Pie } from 'recharts';
-import { Shield, AlertTriangle, CheckCircle, Activity, Clock, TrendingDown, Zap, Flag, Pause, MinusCircle } from 'lucide-react';
-import { RagState } from '@/lib/mockData';
+import { Shield, AlertTriangle, CheckCircle, Activity, Clock, TrendingDown, Zap, Flag, Pause, MinusCircle, Flame } from 'lucide-react';
+import { RagState, Severity } from '@/lib/mockData';
+import { aggregateHourly, peakWindows } from '@/lib/extraData';
 
 const RAG_HSL: Record<RagState, string> = {
   GREEN: 'hsl(142 71% 45%)',
