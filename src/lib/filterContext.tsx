@@ -303,11 +303,45 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   }, [appendMaster]);
 
   const switchKpiConfig = useCallback((kpiId: string, fileId: string, actor: string) => {
+    const ts = new Date().toISOString();
     setAllData(prev => prev.map(r => {
       if (r.id !== kpiId) return r;
       const e = newEntry('Config Switched', actor, `KPI ${kpiId} → ${fileId}`);
-      return { ...r, ledgerEntries: [...r.ledgerEntries, e] };
+      const newHistory: SlaVersionRecord[] = [
+        ...r.slaHistory,
+        {
+          version: fileId,
+          activeFrom: ts,
+          changedBy: actor,
+          threshold: r.targetSLA,
+          changeNote: `Switched config file → ${fileId}`,
+        },
+      ];
+      return {
+        ...r,
+        slaVersion: fileId,
+        configSnapshotId: fileId,
+        slaHistory: newHistory,
+        ledgerEntries: [...r.ledgerEntries, e],
+      };
     }));
+    setDrilldown(d => {
+      if (!d.row || d.row.id !== kpiId) return d;
+      const e = newEntry('Config Switched', actor, `KPI ${kpiId} → ${fileId}`);
+      return {
+        ...d,
+        row: {
+          ...d.row,
+          slaVersion: fileId,
+          configSnapshotId: fileId,
+          slaHistory: [...d.row.slaHistory, {
+            version: fileId, activeFrom: ts, changedBy: actor,
+            threshold: d.row.targetSLA, changeNote: `Switched config file → ${fileId}`,
+          }],
+          ledgerEntries: [...d.row.ledgerEntries, e],
+        },
+      };
+    });
     appendMaster(newEntry('Config Switched', actor, `${kpiId} → ${fileId}`));
   }, [appendMaster]);
 
