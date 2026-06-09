@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, ReactNode, useCallback, useEffect } from 'react';
 import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag, LedgerEntry, SlaVersionRecord, ImpactTier, getImpactTier } from './mockData';
+import { LOB_META, SYSTEM_META, LobMeta, SystemMeta, CONFIG_FILES, ConfigFile } from './extraData';
 
 export type Role = 'executive' | 'lobManager' | 'spoc' | 'compliance' | 'analyst' | 'admin';
 
@@ -42,6 +43,9 @@ export type Registries = {
   lobs: string[];
   systems: string[];
   processes: string[];
+  lobMeta: Record<string, LobMeta>;
+  systemMeta: Record<string, SystemMeta>;
+  configFiles: ConfigFile[];
 };
 
 type Ctx = {
@@ -59,9 +63,11 @@ type Ctx = {
 
   // Admin authoring
   registries: Registries;
-  addLob: (name: string, actor: string) => void;
-  addSystem: (name: string, actor: string) => void;
+  addLob: (name: string, actor: string, meta?: Partial<LobMeta>) => void;
+  addSystem: (name: string, actor: string, meta?: Partial<SystemMeta>) => void;
   addKpi: (input: AddKpiInput, actor: string) => void;
+  addConfigFile: (file: ConfigFile, actor: string) => void;
+  switchKpiConfig: (kpiId: string, fileId: string, actor: string) => void;
 
   // Ledgers + config integrity
   masterLedger: LedgerEntry[];
@@ -137,6 +143,9 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     lobs: [...FILTER_OPTIONS.LOBS],
     systems: [...FILTER_OPTIONS.SYSTEMS],
     processes: [...FILTER_OPTIONS.PROCESSES],
+    lobMeta: { ...LOB_META },
+    systemMeta: { ...SYSTEM_META },
+    configFiles: [...CONFIG_FILES],
   });
 
   const [masterLedger, setMasterLedger] = useState<LedgerEntry[]>([
@@ -246,21 +255,43 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setDrilldown(d => d.row && d.row.id === id ? { ...d, row: { ...d.row, ...patch } as KPIRow } : d);
   }, []);
 
-  const addLob = useCallback((name: string, actor: string) => {
+  const addLob = useCallback((name: string, actor: string, meta?: Partial<LobMeta>) => {
     if (!name || registries.lobs.includes(name)) return;
-    setRegistries(r => ({ ...r, lobs: [...r.lobs, name] }));
-    const e = newEntry('LoB Created', actor, `name=${name}`);
+    setRegistries(r => ({
+      ...r,
+      lobs: [...r.lobs, name],
+      lobMeta: { ...r.lobMeta, [name]: { owner: '', ownerEmail: '', ownerPhone: '', hod: '', deputy: '', region: '', tier: 'T3', parentLob: null, costCenter: '', regulatoryScope: ['Internal'], linkedSystems: [], defaultSla: 'SLA_v1.3', ...meta } },
+    }));
+    const e = newEntry('LoB Created', actor, `name=${name}${meta?.owner ? ` · owner=${meta.owner}` : ''}`);
     setLobLedgers(prev => ({ ...prev, [name]: [e] }));
     appendMaster(e);
   }, [registries.lobs, appendMaster]);
 
-  const addSystem = useCallback((name: string, actor: string) => {
+  const addSystem = useCallback((name: string, actor: string, meta?: Partial<SystemMeta>) => {
     if (!name || registries.systems.includes(name)) return;
-    setRegistries(r => ({ ...r, systems: [...r.systems, name] }));
-    const e = newEntry('System / Department Created', actor, `name=${name}`);
+    setRegistries(r => ({
+      ...r,
+      systems: [...r.systems, name],
+      systemMeta: { ...r.systemMeta, [name]: { owner: '', ownerEmail: '', ownerPhone: '', ownerOrg: '', region: '', tier: 'T3', linkedLobs: [], defaultSla: 'SLA_v1.3', ...meta } },
+    }));
+    const e = newEntry('System / Department Created', actor, `name=${name}${meta?.owner ? ` · owner=${meta.owner}` : ''}`);
     setSystemLedgers(prev => ({ ...prev, [name]: [e] }));
     appendMaster(e);
   }, [registries.systems, appendMaster]);
+
+  const addConfigFile = useCallback((file: ConfigFile, actor: string) => {
+    setRegistries(r => r.configFiles.find(f => f.id === file.id) ? r : ({ ...r, configFiles: [...r.configFiles, file] }));
+    appendMaster(newEntry('Config File Added', actor, `${file.label} · ${file.activeRange}`));
+  }, [appendMaster]);
+
+  const switchKpiConfig = useCallback((kpiId: string, fileId: string, actor: string) => {
+    setAllData(prev => prev.map(r => {
+      if (r.id !== kpiId) return r;
+      const e = newEntry('Config Switched', actor, `KPI ${kpiId} → ${fileId}`);
+      return { ...r, ledgerEntries: [...r.ledgerEntries, e] };
+    }));
+    appendMaster(newEntry('Config Switched', actor, `${kpiId} → ${fileId}`));
+  }, [appendMaster]);
 
   const addKpi = useCallback((input: AddKpiInput, actor: string) => {
     const id = `KPI-${90000 + Math.floor(Math.random() * 9999)}`;
@@ -354,7 +385,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     <FilterContext.Provider value={{
       filters, setFilters, filteredData, allData, historyView,
       drilldown, drilldownStack, openDrilldown, popDrilldown, closeDrilldown, mutateRow,
-      registries, addLob, addSystem, addKpi,
+      registries, addLob, addSystem, addKpi, addConfigFile, switchKpiConfig,
       masterLedger, lobLedgers, systemLedgers, configSnapshots,
     }}>
       {children}

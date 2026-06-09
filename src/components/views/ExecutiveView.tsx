@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { cn, CHART_TOOLTIP } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Cell, PieChart, Pie } from 'recharts';
-import { Shield, AlertTriangle, CheckCircle, Activity, Clock, TrendingDown, Zap, Flag, Pause, MinusCircle } from 'lucide-react';
-import { RagState } from '@/lib/mockData';
+import { Shield, AlertTriangle, CheckCircle, Activity, Clock, TrendingDown, Zap, Flag, Pause, MinusCircle, Flame } from 'lucide-react';
+import { RagState, Severity } from '@/lib/mockData';
+import { aggregateHourly, peakWindows } from '@/lib/extraData';
 
 const RAG_HSL: Record<RagState, string> = {
   GREEN: 'hsl(142 71% 45%)',
@@ -15,7 +16,7 @@ const RAG_HSL: Record<RagState, string> = {
 };
 
 export function ExecutiveView() {
-  const { filteredData, openDrilldown } = useFilters();
+  const { filteredData, openDrilldown, filters, setFilters } = useFilters();
 
   const ragDist = useMemo(() => {
     const counts: Record<RagState, number> = { GREEN: 0, AMBER: 0, RED: 0, GREY: 0, BLUE: 0, UNCONFIGURED: 0 };
@@ -80,8 +81,49 @@ export function ExecutiveView() {
     return Array.from(m.entries()).map(([name, d]) => ({ name, ...d })).sort((a, b) => b.breaches - a.breaches);
   }, [filteredData]);
 
+  /* Severity bucket counts across breached rows */
+  const sevBuckets = useMemo(() => {
+    const b: Record<Severity, number> = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    filteredData.forEach(r => { if (r.status === 'BREACHED') b[r.severity]++; });
+    return b;
+  }, [filteredData]);
+
+  /* System × Hour heatmap data */
+  const heatmap = useMemo(() => {
+    const systems = Array.from(new Set(filteredData.map(r => r.system)));
+    return systems.map(sys => {
+      const rows = filteredData.filter(r => r.system === sys);
+      const hourly = aggregateHourly(rows);
+      const peaks = peakWindows(hourly, 1);
+      return { system: sys, hourly, peak: peaks[0] ?? null, max: Math.max(...hourly) };
+    });
+  }, [filteredData]);
+
   return (
     <div className="space-y-3">
+      {/* Severity summary strip */}
+      <div className="grid grid-cols-4 gap-2">
+        {(['Critical', 'High', 'Medium', 'Low'] as Severity[]).map(s => (
+          <button
+            key={s}
+            onClick={() => setFilters(f => ({ ...f, severities: f.severities.includes(s) ? f.severities.filter(x => x !== s) : [s] }))}
+            className={cn(
+              'rounded-md px-3 py-2 border text-left transition-all',
+              s === 'Critical' ? 'bg-rag-red border-rag-red' :
+              s === 'High'     ? 'bg-rag-amber border-rag-amber' :
+              s === 'Medium'   ? 'border-border bg-secondary/40' : 'border-border bg-secondary/20',
+              filters.severities.includes(s) && 'ring-1 ring-primary',
+            )}
+          >
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s} breaches</div>
+            <div className={cn('text-lg font-semibold font-mono',
+              s === 'Critical' ? 'rag-red' : s === 'High' ? 'rag-amber' : 'text-foreground')}>
+              {sevBuckets[s]}
+            </div>
+          </button>
+        ))}
+      </div>
+
       {/* Executive Flag banner */}
       {metrics.execFlagged > 0 && (
         <div className="bg-rag-red border border-rag-red rounded-md px-3 py-2 flex items-center gap-2 exec-pulse">
@@ -197,6 +239,44 @@ export function ExecutiveView() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      </div>
+
+      {/* System × Hour heatmap — when do systems crash? */}
+      <div className="bg-card border border-border rounded-md p-3">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Flame className="h-3 w-3" /> System × Hour Breach Heatmap (UTC) · click a system row to drilldown
+        </h3>
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="text-[9px]">
+            <thead>
+              <tr>
+                <th className="text-left pr-2 py-1 font-medium text-muted-foreground min-w-[110px]">System</th>
+                {Array.from({ length: 24 }, (_, h) => (
+                  <th key={h} className="px-0 py-1 font-mono text-muted-foreground text-center w-[22px]">{String(h).padStart(2, '0')}</th>
+                ))}
+                <th className="pl-2 py-1 font-medium text-muted-foreground text-left min-w-[150px]">Worst window</th>
+              </tr>
+            </thead>
+            <tbody>
+              {heatmap.map(h => (
+                <tr key={h.system} onClick={() => openDrilldown('system', h.system)} className="cursor-pointer hover:bg-accent/30">
+                  <td className="pr-2 py-1 font-semibold text-foreground">{h.system}</td>
+                  {h.hourly.map((v, hi) => {
+                    const intensity = h.max > 0 ? v / h.max : 0;
+                    const bg = intensity === 0 ? 'transparent' :
+                      intensity > 0.7 ? 'hsl(0 72% 51% / 0.85)' :
+                      intensity > 0.4 ? 'hsl(0 72% 51% / 0.55)' :
+                      intensity > 0.2 ? 'hsl(38 92% 50% / 0.55)' : 'hsl(38 92% 50% / 0.25)';
+                    return <td key={hi} className="text-center" style={{ background: bg, color: intensity > 0.4 ? 'white' : 'hsl(215 15% 60%)' }}>{v > 0 ? v : ''}</td>;
+                  })}
+                  <td className="pl-2 py-1 text-muted-foreground">
+                    {h.peak ? <span><span className="rag-red font-semibold">{h.peak.label}</span> · {h.peak.count}</span> : <span className="italic">no breaches</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

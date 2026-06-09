@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useFilters } from '@/lib/filterContext';
 import { cn, escalationCountdown } from '@/lib/utils';
-import { Users, AlertCircle, ArrowUpRight, GitFork, Clock, Flag } from 'lucide-react';
+import { Users, AlertCircle, ArrowUpRight, GitFork, Clock, Flag, History } from 'lucide-react';
 import { RagState, RAG_SHORT, getContactPhone } from '@/lib/mockData';
+import { DUMMY_ESCALATION_TRAILS } from '@/lib/extraData';
 
 const RAG_BG: Record<RagState, string> = {
   GREEN: 'bg-rag-green border-rag-green',
@@ -97,7 +98,7 @@ export function LobManagerView() {
                             w === 'GREY' ? 'rag-grey' : w === 'BLUE' ? 'rag-blue' : 'rag-green')}>
                             {RAG_SHORT[w]}
                           </div>
-                          <div className="text-muted-foreground text-[9px]">{c.breaches > 0 ? `${c.breaches} br.` : '—'}</div>
+                          <div className="text-muted-foreground text-[9px]">{c.breaches > 0 ? `${c.breaches} breaches` : '—'}</div>
                         </div>
                       </td>
                     );
@@ -140,8 +141,52 @@ export function LobManagerView() {
                 </div>
               );
             })}
-            {rail.length === 0 && <div className="text-[10px] text-muted-foreground italic text-center py-4">No active escalations</div>}
+            {rail.length === 0 && DUMMY_ESCALATION_TRAILS.slice(0, 5).map(d => (
+              <div key={d.id} className="rounded border px-2 py-1.5 text-[10px] bg-rag-amber border-rag-amber">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-semibold text-foreground">{d.kpiId}</span>
+                  <span className="text-[9px] text-muted-foreground">demo</span>
+                </div>
+                <div className="text-muted-foreground mt-0.5">{d.system} · {d.lob}</div>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="text-muted-foreground">{d.fromActor} → {d.toActor}</span>
+                  <span className="rag-amber font-semibold">{d.status}</span>
+                </div>
+              </div>
+            ))}
           </div>
+        </div>
+      </div>
+
+      {/* Recent Escalation Trails — timeline */}
+      <div className="bg-card border border-border rounded-md p-3">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <History className="h-3 w-3" /> Recent Escalation Trails
+        </h3>
+        <div className="space-y-1.5">
+          {DUMMY_ESCALATION_TRAILS.map(d => {
+            const mins = Math.floor((Date.now() - new Date(d.timestamp).getTime()) / 60000);
+            const ago = mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+            return (
+              <div key={d.id} className="flex items-start gap-2 text-[10px] border-l-2 border-rag-amber/50 pl-2 py-0.5">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono font-semibold text-foreground">{d.kpiId}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="font-semibold text-foreground">{d.fromActor}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span className="font-semibold rag-amber">{d.toActor}</span>
+                    <span className={cn('ml-1 text-[9px] px-1 py-0.5 rounded font-semibold',
+                      d.status === 'Resolved' ? 'bg-rag-green rag-green' :
+                      d.status === 'Acknowledged' ? 'bg-rag-amber rag-amber' : 'bg-rag-red rag-red',
+                    )}>{d.status}</span>
+                  </div>
+                  <div className="text-muted-foreground">{d.system} · {d.lob} · {d.reason}</div>
+                </div>
+                <span className="font-mono text-muted-foreground shrink-0">{ago}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

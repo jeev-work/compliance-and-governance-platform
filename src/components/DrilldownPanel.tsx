@@ -5,12 +5,14 @@ import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, Lock, Timer, Phone, ArrowLeft, Download, Activity, Search,
+  Flag, Wrench, GitFork, Send, Lock, Timer, Phone, ArrowLeft, Download, Activity, Search, Pin, Settings, Plug,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
 import { CommentBoxWithMedia, AttachmentThumbs, CommentSubmission } from '@/components/CommentBoxWithMedia';
+import { usePinned } from '@/components/PinnedKpiRail';
+import { CONNECTION_LOST_MAP } from '@/lib/extraData';
 
 /** Inline contact phone badge — shown next to any displayed person name. */
 function ContactPhone({ name }: { name: string | null | undefined }) {
@@ -125,6 +127,25 @@ function FooterExport({ onClick, label = 'Export' }: { onClick: () => void; labe
   );
 }
 
+/** Pin / unpin a KPI into the role's pinned rail at the top of the dashboard. */
+function PinButton({ kpiId }: { kpiId: string }) {
+  const { filters } = useFilters();
+  const [pins, toggle] = usePinned(filters.role);
+  const pinned = pins.includes(kpiId);
+  return (
+    <button
+      onClick={() => { toggle(kpiId); toast.success(pinned ? 'Unpinned' : 'Pinned to your rail'); }}
+      title={pinned ? 'Unpin from your rail' : 'Pin to your rail'}
+      className={cn(
+        'p-1.5 rounded border text-[10px] flex items-center gap-1',
+        pinned ? 'bg-primary/20 border-primary/40 text-primary' : 'bg-secondary border-border text-muted-foreground hover:text-foreground',
+      )}
+    >
+      <Pin className={cn('h-3 w-3', pinned && 'fill-current')} />
+    </button>
+  );
+}
+
 function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel, onSelect }: {
   system: string; process: string; rows: KPIRow[]; onClose: () => void; onBack: () => void; backLabel?: string; onSelect: (r: KPIRow) => void;
 }) {
@@ -195,7 +216,7 @@ function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel
 }
 
 function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClose: () => void; onBack: () => void; backLabel?: string }) {
-  const { filters, mutateRow, configSnapshots, registries } = useFilters();
+  const { filters, mutateRow, configSnapshots, registries, addConfigFile, switchKpiConfig } = useFilters();
   const actions = ROLE_ACTIONS[filters.role];
 
   // Dependency toggle modal state
@@ -214,6 +235,7 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
   }>(null);
 
   // Resolve confirmation modal — captures a comment + media before closing.
+  const [configModal, setConfigModal] = useState(false);
   const [resolveModal, setResolveModal] = useState<null | {
     mode: 'standard' | 'cascade'; comment: string; attachments: string[];
   }>(null);
@@ -498,7 +520,10 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+          <div className="flex items-center gap-1">
+            <PinButton kpiId={row.id} />
+            <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+          </div>
         </div>
 
         {/* RAG strip + SLA Version + Severity = Impact × Urgency */}
@@ -527,7 +552,31 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           )}
         </div>
 
-        {/* Key metrics */}
+        {/* Unconfigured / Connection-lost info card */}
+        {(row.ragState === 'UNCONFIGURED' || row.ragState === 'GREY') && (() => {
+          const lost = CONNECTION_LOST_MAP[row.id];
+          const isUnc = row.ragState === 'UNCONFIGURED';
+          return (
+            <div className={cn(
+              'mx-4 my-3 px-3 py-2.5 rounded border flex items-start gap-2',
+              isUnc ? 'border-dashed border-rag-unconfigured rag-unconfigured' : 'border-rag-grey bg-rag-grey',
+            )}>
+              <Plug className={cn('h-4 w-4 shrink-0 mt-0.5', isUnc ? 'rag-unconfigured' : 'rag-grey')} />
+              <div className="flex-1 text-[11px]">
+                <div className="font-semibold text-foreground">
+                  {isUnc ? 'KPI not yet configured — chase mechanism active' : 'Connection dead — routed to Platform Admin'}
+                </div>
+                <div className="text-muted-foreground mt-0.5">
+                  {lost && <span>Connection lost <span className="text-foreground font-mono">{Math.floor((Date.now() - new Date(lost.lostAt).getTime()) / 60000)}m</span> ago · </span>}
+                  {lost ? <span>Contact <span className="text-foreground font-semibold">{lost.contactPerson}</span> from <span className="text-foreground">{lost.contactOrg}</span> to restore the feed.</span>
+                       : isUnc ? <span>Owner has been notified; escalation will fire after 24h without configuration.</span>
+                       : <span>Telemetry will resume once the upstream connector recovers.</span>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="grid grid-cols-5 gap-2 px-4 py-3 border-b border-border">
           <MiniStat label="Severity" value={row.severity} color={row.severity === 'Critical' ? 'red' : row.severity === 'High' ? 'amber' : 'green'} />
           <MiniStat label="Risk Score" value={String(row.riskScore)} color={row.riskScore >= 70 ? 'red' : row.riskScore >= 40 ? 'amber' : 'green'} />
@@ -792,8 +841,11 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           {actions.includes('executiveFlag') && row.executiveFlag && (
             <ActionBtn icon={Flag} label="Un-flag (Exec)" onClick={onUnflag} variant="amber" />
           )}
-          {actions.length === 0 && (
-            <span className="text-[10px] text-muted-foreground italic">Read-only role · no actions available</span>
+          {filters.role === 'admin' && (
+            <ActionBtn icon={Settings} label="Change Config" onClick={() => setConfigModal(true)} />
+          )}
+          {actions.length === 0 && filters.role !== 'admin' && (
+            <span className="text-[10px] text-muted-foreground italic">No actions in this role · view-only context</span>
           )}
           <div className="ml-auto">
             <FooterExport onClick={onExport} />
@@ -1162,6 +1214,17 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           </div>
         </div>
       )}
+
+      {/* Admin Change-Config modal: switch existing or add new config file */}
+      {configModal && (
+        <ChangeConfigModal
+          kpiId={row.id}
+          configFiles={registries.configFiles}
+          onSwitch={(fid) => { switchKpiConfig(row.id, fid, 'Admin · You'); toast.success(`Config switched → ${fid}`); setConfigModal(false); }}
+          onAddFile={(file) => { addConfigFile(file, 'Admin · You'); toast.success(`Config file added · ${file.label}`); }}
+          onClose={() => setConfigModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1291,6 +1354,80 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
     <div>
       <div className="text-[9px] text-muted-foreground uppercase tracking-wider">{label}</div>
       <div className={cn('text-sm font-semibold font-mono', color === 'red' ? 'rag-red' : color === 'amber' ? 'rag-amber' : 'rag-green')}>{value}</div>
+    </div>
+  );
+}
+
+function ChangeConfigModal({ kpiId, configFiles, onSwitch, onAddFile, onClose }: {
+  kpiId: string;
+  configFiles: { id: string; label: string; description: string; activeRange: string }[];
+  onSwitch: (fileId: string) => void;
+  onAddFile: (file: { id: string; label: string; description: string; activeRange: string }) => void;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<'switch' | 'add'>('switch');
+  const [selected, setSelected] = useState<string>(configFiles[0]?.id ?? '');
+  const [newFile, setNewFile] = useState({ id: '', label: '', description: '', activeRange: '' });
+  return (
+    <div className="fixed inset-0 z-[60] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Settings className="h-4 w-4 text-primary" /> Change Configuration · <span className="font-mono">{kpiId}</span>
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="flex items-center gap-1 px-4 pt-2 border-b border-border">
+          {(['switch', 'add'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={cn(
+                'text-[10px] font-semibold px-3 py-1.5 border-b-2 -mb-px',
+                tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}>
+              {t === 'switch' ? 'Switch existing' : 'Add new'}
+            </button>
+          ))}
+        </div>
+        <div className="p-4 space-y-3">
+          {tab === 'switch' && (
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Select configuration profile</label>
+              {configFiles.map(f => (
+                <label key={f.id} className={cn('block p-2 rounded border cursor-pointer text-[10px]',
+                  selected === f.id ? 'border-primary/40 bg-primary/5' : 'border-border bg-secondary/30 hover:bg-accent/30')}>
+                  <div className="flex items-center gap-2">
+                    <input type="radio" checked={selected === f.id} onChange={() => setSelected(f.id)} />
+                    <span className="font-semibold text-foreground">{f.label}</span>
+                    <span className="ml-auto font-mono text-muted-foreground">{f.activeRange}</span>
+                  </div>
+                  <div className="text-muted-foreground mt-0.5 pl-5">{f.description}</div>
+                </label>
+              ))}
+              <button onClick={() => selected && onSwitch(selected)}
+                className="w-full text-[11px] px-3 py-1.5 rounded border bg-primary/15 border-primary/40 text-primary font-semibold hover:bg-primary/25">
+                Switch to selected
+              </button>
+            </div>
+          )}
+          {tab === 'add' && (
+            <div className="space-y-2">
+              <input value={newFile.id} onChange={e => setNewFile({ ...newFile, id: e.target.value })} placeholder="config-id (e.g. summer-2026)"
+                className="w-full h-8 text-xs bg-secondary border border-border rounded px-2" />
+              <input value={newFile.label} onChange={e => setNewFile({ ...newFile, label: e.target.value })} placeholder="Display label"
+                className="w-full h-8 text-xs bg-secondary border border-border rounded px-2" />
+              <input value={newFile.activeRange} onChange={e => setNewFile({ ...newFile, activeRange: e.target.value })} placeholder="Active range"
+                className="w-full h-8 text-xs bg-secondary border border-border rounded px-2" />
+              <textarea value={newFile.description} onChange={e => setNewFile({ ...newFile, description: e.target.value })} placeholder="Description"
+                rows={3} className="w-full text-xs bg-secondary border border-border rounded px-2 py-1" />
+              <button
+                onClick={() => { if (newFile.id && newFile.label) { onAddFile(newFile); setNewFile({ id: '', label: '', description: '', activeRange: '' }); setTab('switch'); } }}
+                className="w-full text-[11px] px-3 py-1.5 rounded border bg-primary/15 border-primary/40 text-primary font-semibold hover:bg-primary/25">
+                Add configuration file
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

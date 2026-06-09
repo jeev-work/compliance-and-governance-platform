@@ -154,6 +154,13 @@ export function NotificationPanel() {
 
   const topCount = notifs.length;
 
+  // Severity bucket counts across the filtered set
+  const sevBuckets = useMemo(() => {
+    const b = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    filteredData.forEach(r => { if (r.status === 'BREACHED') b[r.severity]++; });
+    return b;
+  }, [filteredData]);
+
   return (
     <div className="bg-card border border-border rounded-md mb-2">
       <button
@@ -163,6 +170,12 @@ export function NotificationPanel() {
         <Bell className="h-4 w-4 text-primary" />
         <span className="text-xs font-semibold text-foreground">{meta.title}</span>
         <span className="text-[10px] text-muted-foreground">· {meta.subtitle}</span>
+        <span className="ml-3 flex items-center gap-1 text-[9px] font-mono">
+          <span className="px-1.5 py-0.5 rounded bg-rag-red rag-red font-bold border border-rag-red">CRIT {sevBuckets.Critical}</span>
+          <span className="px-1.5 py-0.5 rounded bg-rag-amber rag-amber font-bold border border-rag-amber">HIGH {sevBuckets.High}</span>
+          <span className="px-1.5 py-0.5 rounded border border-border text-muted-foreground">MED {sevBuckets.Medium}</span>
+          <span className="px-1.5 py-0.5 rounded border border-border text-muted-foreground">LOW {sevBuckets.Low}</span>
+        </span>
         <span className={cn(
           'ml-auto text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border',
           topCount === 0 ? 'border-border text-muted-foreground' : 'border-primary/40 bg-primary/15 text-primary',
