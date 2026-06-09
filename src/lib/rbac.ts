@@ -15,7 +15,6 @@ export const ROLE_ACTIONS: Record<Role, DrilldownAction[]> = {
   lobManager: ['reassign', 'escalate'],
   spoc: ['acknowledge', 'deployResolution', 'tagDependency'],
   compliance: ['exportAudit'],
-  analyst: [],
   admin: [],
 };
 
@@ -23,8 +22,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   executive: 'Executive Leadership',
   lobManager: 'LOB Manager',
   spoc: 'IT System SPOC',
-  compliance: 'Compliance & Audit',
-  analyst: 'Generic Viewer / Analyst',
+  compliance: 'Compliance, Audit, Analyst',
   admin: 'Platform Admin',
 };
 
@@ -32,7 +30,6 @@ export const ROLE_PURPOSE: Record<Role, string> = {
   executive: 'Enterprise-wide read-only with Executive Flag override',
   lobManager: 'Aggregated LoB matrix · escalation rail · reassignment',
   spoc: 'Actionable alert inbox · acknowledge / resolve / fork',
-  compliance: 'Immutable ledger query · hashed regulatory export',
-  analyst: 'Historical trends · SLA% month-over-month · no PII',
+  compliance: 'Immutable ledger query · hashed regulatory export · historical SLA trends',
   admin: 'Connector health · SLA vault versions · DLQ',
 };

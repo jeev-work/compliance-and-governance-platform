@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useMemo, ReactNode, useCall
 import { generateMockData, KPIRow, FILTER_OPTIONS, RagState, Severity, StateFlag, LedgerEntry, SlaVersionRecord, ImpactTier, getImpactTier } from './mockData';
 import { LOB_META, SYSTEM_META, LobMeta, SystemMeta, CONFIG_FILES, ConfigFile } from './extraData';
 
-export type Role = 'executive' | 'lobManager' | 'spoc' | 'compliance' | 'analyst' | 'admin';
+export type Role = 'executive' | 'lobManager' | 'spoc' | 'compliance' | 'admin';
 
 export type DatePreset = '1H' | '24H' | '7D' | '30D' | '60D' | '90D' | 'CUSTOM';
 

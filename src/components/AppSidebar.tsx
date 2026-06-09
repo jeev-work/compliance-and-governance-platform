@@ -1,4 +1,4 @@
-import { Shield, LayoutDashboard, LineChart, Wrench, Flag, FileCheck, ServerCog, Siren, Play, Activity } from 'lucide-react';
+import { Shield, LayoutDashboard, LineChart, Wrench, Flag, FileCheck, ServerCog, Siren, Play, Activity, Workflow } from 'lucide-react';
 import { useFilters, Role } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
 import { KPIRow, RagState, Severity } from '@/lib/mockData';
@@ -43,7 +43,7 @@ const SCENARIOS: Scenario[] = [
     pick: (rows) => rows.find(r => r.executiveFlag) || rows.find(r => r.ragState === 'RED' && r.severity === 'Critical'),
   },
   {
-    id: 's5', num: 5, label: 'Compliance / Auditor / Analyst', icon: FileCheck,
+    id: 's5', num: 5, label: 'Compliance, Audit, Analyst', icon: FileCheck,
     blurb: 'WORM ledger · SLA% trend · SHA-256 export',
     role: 'compliance',
   },
@@ -57,16 +57,25 @@ const SCENARIOS: Scenario[] = [
     blurb: 'Blackout overlay · OOB SMS · siren',
     wallboard: true,
   },
+  {
+    id: 's8', num: 8, label: 'KPI Lifecycle', icon: Workflow,
+    blurb: 'Configured → Resolved → Green · full timeline',
+  },
 ];
 
-export function AppSidebar({ onLaunchWallboard, activeWallboard }: {
+export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecycle, activeLifecycle, onLeaveLifecycle }: {
   onLaunchWallboard: () => void;
   activeWallboard: boolean;
+  onLaunchLifecycle: () => void;
+  activeLifecycle: boolean;
+  onLeaveLifecycle: () => void;
 }) {
   const { filters, setFilters, allData, openDrilldown, closeDrilldown } = useFilters();
 
   const runScenario = (s: Scenario) => {
     if (s.wallboard) { onLaunchWallboard(); return; }
+    if (s.id === 's8') { onLaunchLifecycle(); return; }
+    onLeaveLifecycle();
 
     setFilters(f => ({
       ...f,
@@ -94,13 +103,17 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard }: {
         <Shield className="h-5 w-5 text-primary shrink-0" />
         <div className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="text-xs font-semibold text-sidebar-accent-foreground">GovShield</div>
-          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Demo Screens · 7</div>
+          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Demo Screens · 8</div>
         </div>
       </div>
 
       <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto scrollbar-thin">
         {SCENARIOS.map((s) => {
-          const isActive = s.wallboard ? activeWallboard : (filters.role === s.role && !activeWallboard);
+          const isActive = s.wallboard
+            ? activeWallboard
+            : s.id === 's8'
+              ? activeLifecycle
+              : (filters.role === s.role && !activeWallboard && !activeLifecycle);
           return (
             <button
               key={s.id}
