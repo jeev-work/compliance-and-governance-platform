@@ -5,12 +5,14 @@ import { ROLE_ACTIONS } from '@/lib/rbac';
 import { cn, CHART_TOOLTIP, escalationCountdown, fmtMinutes } from '@/lib/utils';
 import {
   X, Clock, User, MessageSquare, ArrowUpRight, AlertTriangle, CheckCircle2, Shield,
-  Flag, Wrench, GitFork, Send, Lock, Timer, Phone, ArrowLeft, Download, Activity, Search,
+  Flag, Wrench, GitFork, Send, Lock, Timer, Phone, ArrowLeft, Download, Activity, Search, Pin, Settings, Plug,
 } from 'lucide-react';
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { toast } from 'sonner';
 import { CommentBoxWithMedia, AttachmentThumbs, CommentSubmission } from '@/components/CommentBoxWithMedia';
+import { usePinned } from '@/components/PinnedKpiRail';
+import { CONNECTION_LOST_MAP } from '@/lib/extraData';
 
 /** Inline contact phone badge — shown next to any displayed person name. */
 function ContactPhone({ name }: { name: string | null | undefined }) {
@@ -792,8 +794,8 @@ function BreachDetail({ row, onClose, onBack, backLabel }: { row: KPIRow; onClos
           {actions.includes('executiveFlag') && row.executiveFlag && (
             <ActionBtn icon={Flag} label="Un-flag (Exec)" onClick={onUnflag} variant="amber" />
           )}
-          {actions.length === 0 && (
-            <span className="text-[10px] text-muted-foreground italic">Read-only role · no actions available</span>
+          {actions.length === 0 && filters.role !== 'admin' && (
+            <span className="text-[10px] text-muted-foreground italic">No actions in this role · view-only context</span>
           )}
           <div className="ml-auto">
             <FooterExport onClick={onExport} />
