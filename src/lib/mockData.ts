@@ -438,8 +438,8 @@ export function generateMockData(count = 30000): KPIRow[] {
         stateFlags.push('Cross-Functional');
       }
 
-      // ~0.5% of Red get Executive Flag stamp
-      if (ragState === 'RED' && rand() < 0.05) {
+      // Executive Flag stamp: ~18% of RED, ~3% of AMBER — gives demo a meaningful Exec Flag count
+      if ((ragState === 'RED' && rand() < 0.18) || (ragState === 'AMBER' && rand() < 0.03)) {
         executiveFlag = true;
         stateFlags.push('Escalated');
       }
