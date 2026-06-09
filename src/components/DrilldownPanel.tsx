@@ -127,6 +127,25 @@ function FooterExport({ onClick, label = 'Export' }: { onClick: () => void; labe
   );
 }
 
+/** Pin / unpin a KPI into the role's pinned rail at the top of the dashboard. */
+function PinButton({ kpiId }: { kpiId: string }) {
+  const { filters } = useFilters();
+  const [pins, toggle] = usePinned(filters.role);
+  const pinned = pins.includes(kpiId);
+  return (
+    <button
+      onClick={() => { toggle(kpiId); toast.success(pinned ? 'Unpinned' : 'Pinned to your rail'); }}
+      title={pinned ? 'Unpin from your rail' : 'Pin to your rail'}
+      className={cn(
+        'p-1.5 rounded border text-[10px] flex items-center gap-1',
+        pinned ? 'bg-primary/20 border-primary/40 text-primary' : 'bg-secondary border-border text-muted-foreground hover:text-foreground',
+      )}
+    >
+      <Pin className={cn('h-3 w-3', pinned && 'fill-current')} />
+    </button>
+  );
+}
+
 function MatrixCellDrilldown({ system, process, rows, onClose, onBack, backLabel, onSelect }: {
   system: string; process: string; rows: KPIRow[]; onClose: () => void; onBack: () => void; backLabel?: string; onSelect: (r: KPIRow) => void;
 }) {
