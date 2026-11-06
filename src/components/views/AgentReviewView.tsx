@@ -39,6 +39,8 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
   const incidentRows = portfolioRows.filter(row => row.status === 'BREACHED' || row.chaseTimeline.length > 0 || row.ledgerEntries.some(entry => /Ticket Generated|Ticket Closed/i.test(entry.action)));
   const notifiedCount = incidentRows.filter(row => row.chaseTimeline.some(event => event.step === 'Notified')).length;
   const acknowledgedCount = incidentRows.filter(row => row.chaseTimeline.some(event => event.step === 'Acknowledged')).length;
+  const traceableIncidentCount = incidentRows.filter(row => row.ledgerEntries.length > 0 || row.chaseTimeline.length > 0).length;
+  const unconfiguredCount = portfolioRows.filter(row => row.ragState === 'UNCONFIGURED').length;
   const configuredCount = portfolioRows.filter(row => row.slaHistory.length > 0 && row.targetSLA > 0).length;
   const ledgerCoveredCount = portfolioRows.filter(row => row.ledgerEntries.length > 0).length;
   const resolvedRows = incidentRows.filter(row => row.resolutionStatus === 'Resolved' || row.resolutionStatus === 'Clean');
@@ -77,10 +79,12 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
           <Metric icon={Activity} label="Avg. resolution time" value={showTime(avgResolve)} detail={`${formatNumber(resolvedRows.filter(row => row.timeToResolveMin != null).length)} resolved records with timing`} />
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2">
           <Metric icon={Activity} label="KPI records in scope" value={formatNumber(portfolioRows.length)} detail="Filtered platform records" />
           <Metric icon={FileCheck2} label="Configuration coverage" value={formatPercent(configuredCount, portfolioRows.length)} detail={`${formatNumber(configuredCount)} with active SLA history`} />
           <Metric icon={ShieldCheck} label="Ledger coverage" value={formatPercent(ledgerCoveredCount, portfolioRows.length)} detail={`${formatNumber(ledgerCoveredCount)} with ledger entries`} tone="rag-green" />
+          <Metric icon={ClipboardList} label="Traceable incidents" value={formatNumber(traceableIncidentCount)} detail={`${formatPercent(traceableIncidentCount, incidentRows.length)} of incident records`} />
+          <Metric icon={AlertTriangle} label="Unconfigured controls" value={formatNumber(unconfiguredCount)} detail="No configuration attached" tone="rag-amber" />
           <Metric icon={ClipboardList} label="Ledger events" value={formatNumber(summary.ledgerEvents)} detail="Across KPI records in scope" />
           <Metric icon={AlertTriangle} label="Active exceptions" value={formatNumber(summary.activeExceptions)} detail={`${formatNumber(summary.resolvedIncidents)} resolved incident records`} tone="rag-red" />
         </div>
@@ -192,6 +196,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                 <ReviewLine label="Configured KPI records" value={`${formatNumber(configuredCount)} / ${formatNumber(portfolioRows.length)}`} />
                 <ReviewLine label="Incident records with notification" value={`${formatNumber(notifiedCount)} / ${formatNumber(incidentRows.length)}`} />
                 <ReviewLine label="Incident records acknowledged" value={`${formatNumber(acknowledgedCount)} / ${formatNumber(incidentRows.length)}`} />
+                <ReviewLine label="Unconfigured controls" value={formatNumber(unconfiguredCount)} />
                 <ReviewLine label="Incident records resolved" value={`${formatNumber(resolvedRows.length)} / ${formatNumber(incidentRows.length)}`} />
                 <ReviewLine label="Incident records with ledger" value={`${formatNumber(incidentRows.filter(row => row.ledgerEntries.length > 0).length)} / ${formatNumber(incidentRows.length)}`} />
               </div>
