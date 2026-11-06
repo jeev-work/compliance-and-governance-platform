@@ -74,14 +74,17 @@ export function buildAgentReviewRows(data: KPIRow[]): AgentReviewRow[] {
 
 export function summarizeAgentReview(rows: AgentReviewRow[]) {
   const observed = rows.filter(row => row.agent.signal === 'proxy');
+  // Agent work scopes overlap by design; portfolio-level totals must count a KPI once.
+  const portfolio = rows.find(row => row.agent.id === 1)?.records ?? [];
+  const incidents = portfolio.filter(incidentRecord);
   return {
     modeledAgents: AGENT_CATALOG.length,
     observedAgents: observed.length,
     notInstrumentedAgents: AGENT_CATALOG.length - observed.length,
-    activeExceptions: observed.reduce((sum, row) => sum + row.activeExceptions, 0),
-    incidentRecords: observed.reduce((sum, row) => sum + row.incidentCount, 0),
-    resolvedIncidents: observed.reduce((sum, row) => sum + row.resolvedIncidents, 0),
-    ledgerEvents: observed.reduce((sum, row) => sum + row.ledgerEvents, 0),
-    configuredRecords: observed.reduce((sum, row) => sum + row.configuredRecords, 0),
+    activeExceptions: incidents.filter(row => row.resolutionStatus !== 'Resolved' && row.resolutionStatus !== 'Clean').length,
+    incidentRecords: incidents.length,
+    resolvedIncidents: incidents.filter(row => row.resolutionStatus === 'Resolved' || row.resolutionStatus === 'Clean').length,
+    ledgerEvents: portfolio.reduce((sum, row) => sum + row.ledgerEntries.length, 0),
+    configuredRecords: portfolio.filter(row => row.slaHistory.length > 0 && row.targetSLA > 0).length,
   };
 }
