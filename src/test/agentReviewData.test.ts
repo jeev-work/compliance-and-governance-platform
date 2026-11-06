@@ -64,4 +64,11 @@ describe('agent review aggregation', () => {
     expect(summary.activeExceptions).toBe(1);
     expect(summary.ledgerEvents).toBe(2);
   });
+
+  it('excludes unconfigured controls from configuration coverage', () => {
+    const unconfigured = makeRow({ ragState: 'UNCONFIGURED', status: 'CLEAN', resolutionStatus: 'Clean' });
+    const summary = summarizeAgentReview(buildAgentReviewRows([unconfigured]));
+
+    expect(summary.configuredRecords).toBe(0);
+  });
 });
