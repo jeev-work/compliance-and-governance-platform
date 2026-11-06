@@ -53,7 +53,7 @@ describe('agent review aggregation', () => {
 
     expect(healthAgent?.agent.signal).toBe('not-instrumented');
     expect(healthAgent?.records).toHaveLength(0);
-    expect(summary.notInstrumentedAgents).toBe(5);
+    expect(summary.notInstrumentedAgents).toBe(6);
   });
 
   it('counts unique portfolio incidents once in the review summary', () => {
