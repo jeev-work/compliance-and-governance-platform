@@ -66,7 +66,7 @@ export function buildAgentReviewRows(data: KPIRow[]): AgentReviewRow[] {
       resolvedIncidents: incidents.filter(row => row.resolutionStatus === 'Resolved' || row.resolutionStatus === 'Clean').length,
       ledgerEvents: records.reduce((total, row) => total + row.ledgerEntries.length, 0),
       recordsWithLedger: records.filter(row => row.ledgerEntries.length > 0).length,
-      configuredRecords: records.filter(row => row.slaHistory.length > 0 && row.targetSLA > 0).length,
+      configuredRecords: records.filter(row => row.ragState !== 'UNCONFIGURED' && row.slaHistory.length > 0 && row.targetSLA > 0).length,
       notifiedRecords: records.filter(row => hasChaseStep(row, 'Notified')).length,
     };
   });
@@ -85,6 +85,6 @@ export function summarizeAgentReview(rows: AgentReviewRow[]) {
     incidentRecords: incidents.length,
     resolvedIncidents: incidents.filter(row => row.resolutionStatus === 'Resolved' || row.resolutionStatus === 'Clean').length,
     ledgerEvents: portfolio.reduce((sum, row) => sum + row.ledgerEntries.length, 0),
-    configuredRecords: portfolio.filter(row => row.slaHistory.length > 0 && row.targetSLA > 0).length,
+    configuredRecords: portfolio.filter(row => row.ragState !== 'UNCONFIGURED' && row.slaHistory.length > 0 && row.targetSLA > 0).length,
   };
 }

@@ -41,7 +41,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
   const acknowledgedCount = incidentRows.filter(row => row.chaseTimeline.some(event => event.step === 'Acknowledged')).length;
   const traceableIncidentCount = incidentRows.filter(row => row.ledgerEntries.length > 0 || row.chaseTimeline.length > 0).length;
   const unconfiguredCount = portfolioRows.filter(row => row.ragState === 'UNCONFIGURED').length;
-  const configuredCount = portfolioRows.filter(row => row.slaHistory.length > 0 && row.targetSLA > 0).length;
+  const configuredCount = portfolioRows.filter(row => row.ragState !== 'UNCONFIGURED' && row.slaHistory.length > 0 && row.targetSLA > 0).length;
   const ledgerCoveredCount = portfolioRows.filter(row => row.ledgerEntries.length > 0).length;
   const resolvedRows = incidentRows.filter(row => row.resolutionStatus === 'Resolved' || row.resolutionStatus === 'Clean');
   const avgResolve = resolvedRows.filter(row => row.timeToResolveMin != null).length
