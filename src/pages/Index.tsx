@@ -8,6 +8,7 @@ import { SpocView } from '@/components/views/SpocView';
 import { ComplianceView } from '@/components/views/ComplianceView';
 import { AdminHealthView } from '@/components/views/AdminHealthView';
 import { KpiLifecycleView } from '@/components/views/KpiLifecycleView';
+import { AgentReviewView } from '@/components/views/AgentReviewView';
 import { DrilldownPanel } from '@/components/DrilldownPanel';
 import { KpiHistoryPanel } from '@/components/KpiHistoryPanel';
 import { NotificationPanel } from '@/components/NotificationPanel';
@@ -18,21 +19,27 @@ function DashboardContent() {
   const { filters } = useFilters();
   const [wallboardOpen, setWallboardOpen] = useState(false);
   const [lifecycleOpen, setLifecycleOpen] = useState(false);
+  const [agentReview, setAgentReview] = useState<'monitoring' | 'compliance' | null>(null);
 
   return (
     <div className="flex min-h-screen w-full">
       <AppSidebar
-        onLaunchWallboard={() => { setWallboardOpen(true); setLifecycleOpen(false); }}
+        onLaunchWallboard={() => { setWallboardOpen(true); setLifecycleOpen(false); setAgentReview(null); }}
         activeWallboard={wallboardOpen}
-        onLaunchLifecycle={() => { setLifecycleOpen(true); setWallboardOpen(false); }}
+        onLaunchLifecycle={() => { setLifecycleOpen(true); setWallboardOpen(false); setAgentReview(null); }}
         activeLifecycle={lifecycleOpen}
         onLeaveLifecycle={() => setLifecycleOpen(false)}
+        onLaunchAgentReview={(mode) => { setAgentReview(mode); setLifecycleOpen(false); setWallboardOpen(false); }}
+        activeAgentReview={agentReview}
+        onLeaveAgentReview={() => setAgentReview(null)}
       />
       <div className="flex-1 flex flex-col min-w-0">
         <GlobalFilterBar />
         <main className="flex-1 p-3 overflow-y-auto scrollbar-thin">
           {lifecycleOpen ? (
             <KpiLifecycleView onClose={() => setLifecycleOpen(false)} />
+          ) : agentReview ? (
+            <AgentReviewView mode={agentReview} onClose={() => setAgentReview(null)} />
           ) : (
             <>
               <KpiHistoryPanel />
