@@ -131,7 +131,7 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
               ? activeLifecycle
               : s.agentReview
                 ? activeAgentReview === s.agentReview
-              : (filters.role === s.role && !activeWallboard && !activeLifecycle);
+              : (filters.role === s.role && !activeWallboard && !activeLifecycle && !activeAgentReview);
           return (
             <button
               key={s.id}
