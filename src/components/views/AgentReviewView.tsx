@@ -38,6 +38,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
   const portfolioRows = agentRows.find(row => row.agent.id === 1)?.records ?? [];
   const incidentRows = portfolioRows.filter(row => row.status === 'BREACHED' || row.chaseTimeline.length > 0 || row.ledgerEntries.some(entry => /Ticket Generated|Ticket Closed/i.test(entry.action)));
   const notifiedCount = incidentRows.filter(row => row.chaseTimeline.some(event => event.step === 'Notified')).length;
+  const acknowledgedCount = incidentRows.filter(row => row.chaseTimeline.some(event => event.step === 'Acknowledged')).length;
   const configuredCount = portfolioRows.filter(row => row.slaHistory.length > 0 && row.targetSLA > 0).length;
   const ledgerCoveredCount = portfolioRows.filter(row => row.ledgerEntries.length > 0).length;
   const resolvedRows = incidentRows.filter(row => row.resolutionStatus === 'Resolved' || row.resolutionStatus === 'Clean');
@@ -67,11 +68,12 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
       </header>
 
       {monitoring ? (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2">
           <Metric icon={Activity} label="KPI records in scope" value={formatNumber(portfolioRows.length)} detail="Filtered platform records" />
           <Metric icon={AlertTriangle} label="Active exceptions" value={formatNumber(summary.activeExceptions)} detail="Unique open / investigating tickets" tone="rag-red" />
           <Metric icon={CheckCircle2} label="Resolved incidents" value={formatNumber(resolvedRows.length)} detail="Historical incident records" tone="rag-green" />
           <Metric icon={ClipboardList} label="Notification coverage" value={formatPercent(notifiedCount, incidentRows.length)} detail={`${formatNumber(notifiedCount)} of ${formatNumber(incidentRows.length)} incident records`} tone="rag-amber" />
+          <Metric icon={CheckCircle2} label="Acknowledgement coverage" value={formatPercent(acknowledgedCount, incidentRows.length)} detail={`${formatNumber(acknowledgedCount)} of ${formatNumber(incidentRows.length)} incident records`} tone="rag-green" />
           <Metric icon={Activity} label="Avg. resolution time" value={showTime(avgResolve)} detail={`${formatNumber(resolvedRows.filter(row => row.timeToResolveMin != null).length)} resolved records with timing`} />
         </div>
       ) : (
@@ -189,6 +191,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
               <div className="space-y-1">
                 <ReviewLine label="Configured KPI records" value={`${formatNumber(configuredCount)} / ${formatNumber(portfolioRows.length)}`} />
                 <ReviewLine label="Incident records with notification" value={`${formatNumber(notifiedCount)} / ${formatNumber(incidentRows.length)}`} />
+                <ReviewLine label="Incident records acknowledged" value={`${formatNumber(acknowledgedCount)} / ${formatNumber(incidentRows.length)}`} />
                 <ReviewLine label="Incident records resolved" value={`${formatNumber(resolvedRows.length)} / ${formatNumber(incidentRows.length)}`} />
                 <ReviewLine label="Incident records with ledger" value={`${formatNumber(incidentRows.filter(row => row.ledgerEntries.length > 0).length)} / ${formatNumber(incidentRows.length)}`} />
               </div>
