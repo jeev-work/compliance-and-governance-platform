@@ -129,14 +129,21 @@ describe('agent review aggregation', () => {
       expect(ascending).toHaveLength(18);
       expect(descending).toHaveLength(18);
       for (let index = 1; index < ascending.length; index += 1) {
-        const previous = valueFor(key, ascending[index - 1]!);
-        const current = valueFor(key, ascending[index]!);
+        const previousRow = ascending[index - 1];
+        const currentRow = ascending[index];
+        const descendingPreviousRow = descending[index - 1];
+        const descendingCurrentRow = descending[index];
+        if (!previousRow || !currentRow || !descendingPreviousRow || !descendingCurrentRow) {
+          throw new Error('Expected sorted agent rows at each index');
+        }
+        const previous = valueFor(key, previousRow);
+        const current = valueFor(key, currentRow);
         expect(typeof previous === 'string' && typeof current === 'string'
           ? previous.localeCompare(current) <= 0
           : Number(previous) <= Number(current)).toBe(true);
 
-        const descendingPrevious = valueFor(key, descending[index - 1]!);
-        const descendingCurrent = valueFor(key, descending[index]!);
+        const descendingPrevious = valueFor(key, descendingPreviousRow);
+        const descendingCurrent = valueFor(key, descendingCurrentRow);
         expect(typeof descendingPrevious === 'string' && typeof descendingCurrent === 'string'
           ? descendingPrevious.localeCompare(descendingCurrent) >= 0
           : Number(descendingPrevious) >= Number(descendingCurrent)).toBe(true);
