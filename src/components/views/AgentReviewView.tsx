@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Activity, AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, FileCheck2, Info, Search, ShieldCheck, X } from 'lucide-react';
 import { useFilters } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
-import { buildAgentReviewRows, evaluateAgentTrust, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type TrustDimensionKey } from '@/lib/agentReviewData';
+import { buildAgentReviewRows, evaluateAgentTrust, rankAgentReviewRows, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type TrustDimensionKey } from '@/lib/agentReviewData';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
@@ -43,9 +43,10 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const monitoring = mode === 'monitoring';
 
-  const agentRows = useMemo(() => buildAgentReviewRows(filteredData), [filteredData]);
+  const agentRows = useMemo(() => rankAgentReviewRows(buildAgentReviewRows(filteredData)), [filteredData]);
   const summary = useMemo(() => summarizeAgentReview(agentRows), [agentRows]);
   const evaluations = useMemo(() => new Map(agentRows.map(row => [row.agent.id, evaluateAgentTrust(row)])), [agentRows]);
+  const redTrustRows = agentRows.filter(row => evaluations.get(row.agent.id)?.band === 'RED');
   const searchedRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? agentRows.filter(({ agent }) => `${agent.id} ${agent.name} ${agent.description}`.toLowerCase().includes(q)) : agentRows;
@@ -78,7 +79,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
             {monitoring
               ? 'Operational review derived from the filtered KPI and incident records.'
               : 'Oversight review of configuration, incident traceability, and ledger evidence in the filtered records.'}
-            {' '}Agent coverage is a platform-data proxy; this demo has no live agent run, latency, token, or policy-verdict telemetry.
+            {' '}Trust dimensions use seeded illustrative demo telemetry; operational counts remain derived from filtered platform records. Values are not live agent telemetry.
           </p>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="ml-auto h-8 w-8 shrink-0" aria-label="Close agent review">
@@ -105,6 +106,33 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
           <Metric icon={ClipboardList} label="Ledger events" value={formatNumber(summary.ledgerEvents)} detail="Across KPI records in scope" />
           <Metric icon={AlertTriangle} label="Active exceptions" value={formatNumber(summary.activeExceptions)} detail={`${formatNumber(summary.resolvedIncidents)} resolved incident records`} tone="rag-red" />
         </div>
+      )}
+
+      {redTrustRows.length > 0 && (
+        <section className="border border-rag-red/40 bg-rag-red/10 px-3 py-2" aria-label="Agents requiring trust-score action">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <AlertTriangle className="h-4 w-4 text-rag-red" />
+            <h2 className="text-xs font-semibold text-rag-red">{redTrustRows.length} agents require action</h2>
+            <span className="text-[10px] text-muted-foreground">RED trust score · select an alert to review the agent</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {redTrustRows.map(row => {
+              const score = evaluations.get(row.agent.id)?.trustScore;
+              const recommendedAction = row.agent.id === 7
+                ? 'Review health telemetry'
+                : row.agent.id === 12
+                  ? 'Review access controls'
+                  : 'Investigate behavior drift';
+              return (
+                <Button key={row.agent.id} variant="outline" size="sm" onClick={() => setSelectedAgentId(row.agent.id)} className="h-auto min-h-8 justify-start gap-2 border-rag-red/40 bg-card px-2 py-1 text-left">
+                  <span className="font-mono text-rag-red">{score}</span>
+                  <span className="text-[10px] text-foreground">{row.agent.name}</span>
+                  <span className="text-[9px] text-muted-foreground">{recommendedAction}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-y border-border py-1.5 text-[10px] text-muted-foreground">
@@ -134,7 +162,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Score is the weighted average of available evidence only. Coverage shows the share of total weight backed by data. GREEN ≥80, AMBER 60–79, RED &lt;60. Proxy scores are not live agent telemetry.</p>
+                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Scores use seeded illustrative demo telemetry across all six dimensions. Values are mock data, not live agent runs or evidence of actual execution. GREEN ≥80, AMBER 60–79, RED &lt;60.</p>
               </PopoverContent>
             </Popover>
             <div className="relative ml-auto w-56 max-w-full">
@@ -193,7 +221,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                   <div className="text-[9px] text-muted-foreground">Evidence-backed trust score</div>
                   <div className="mt-0.5"><TrustScoreCell score={evaluations.get(selected.agent.id)?.trustScore ?? null} coverage={evaluations.get(selected.agent.id)?.evidenceCoverage ?? 0} band={evaluations.get(selected.agent.id)?.band ?? 'UNSCORED'} signal={selected.agent.signal} /></div>
                 </div>
-                <span className="text-[9px] text-muted-foreground">{selected.agent.signal === 'proxy' ? 'Platform-data proxy' : 'Not instrumented'}</span>
+                <span className="text-[9px] text-muted-foreground">Simulated demo telemetry</span>
               </div>
               <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.description}</p>
               <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.signalNote}</p>
@@ -239,7 +267,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                 : 'Review configuration and event traceability without treating KPI records as proof of a live agent execution.'}</p>
               <div className="border-l-2 border-primary/50 pl-2 text-[10px] leading-4 text-muted-foreground">
                 <span className="font-semibold text-foreground">Interpretation boundary</span><br />
-                Proxy counts describe related KPI/case data only. Live agent uptime, latency, cost, model decisions, and policy compliance are not measured here.
+                Trust scores use seeded mock telemetry. KPI/case counts are platform records; neither is proof of live agent execution.
               </div>
               <div className="space-y-1">
                 <ReviewLine label="Configured KPI records" value={`${formatNumber(configuredCount)} / ${formatNumber(portfolioRows.length)}`} />
