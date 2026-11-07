@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KPIRow } from '@/lib/mockData';
-import { buildAgentReviewRows, evaluateAgentTrust, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS } from '@/lib/agentReviewData';
+import { buildAgentReviewRows, evaluateAgentTrust, rankAgentReviewRows, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS } from '@/lib/agentReviewData';
 
 function makeRow(overrides: Partial<KPIRow> = {}): KPIRow {
   return {
@@ -72,31 +72,37 @@ describe('agent review aggregation', () => {
     expect(summary.configuredRecords).toBe(0);
   });
 
-  it('uses the supplied evaluation weights and reports evidence-backed weighted trust only', () => {
+  it('uses seeded demo telemetry across all weighted trust dimensions', () => {
     expect(TRUST_EVALUATION_DIMENSIONS.reduce((total, item) => total + item.weight, 0)).toBe(100);
 
     const row = buildAgentReviewRows([makeRow()]).find(item => item.agent.id === 1);
     if (!row) throw new Error('Continuous Monitoring Agent row was not built');
     const evaluation = evaluateAgentTrust(row);
 
-    expect(evaluation.evidenceCoverage).toBe(55);
-    expect(evaluation.scores.performanceQuality).toBe(0);
-    expect(evaluation.scores.complianceRisk).toBe(0);
-    expect(evaluation.scores.governanceAuditability).toBe(100);
-    expect(evaluation.scores.health).toBeNull();
-    expect(evaluation.scores.behaviorDrift).toBeNull();
-    expect(evaluation.scores.accessToolControl).toBeNull();
-    expect(evaluation.trustScore).toBe(18);
-    expect(evaluation.band).toBe('RED');
+    expect(evaluation.evidenceCoverage).toBe(100);
+    expect(evaluation.scores.performanceQuality).toBe(90);
+    expect(evaluation.scores.complianceRisk).toBe(94);
+    expect(evaluation.scores.governanceAuditability).toBe(97);
+    expect(evaluation.scores.health).toBe(96);
+    expect(evaluation.scores.behaviorDrift).toBe(88);
+    expect(evaluation.scores.accessToolControl).toBe(93);
+    expect(evaluation.trustScore).toBe(93);
+    expect(evaluation.band).toBe('GREEN');
   });
 
-  it('leaves trust unscored when no agent telemetry or scoped records exist', () => {
-    const agent = buildAgentReviewRows([]).find(item => item.agent.id === 7);
-    if (!agent) throw new Error('Agent Health row was not built');
-    const evaluation = evaluateAgentTrust(agent);
+  it('seeds exactly three red trust scores across all 18 agents', () => {
+    const rows = buildAgentReviewRows([]);
+    const redRows = rows.filter(row => evaluateAgentTrust(row).band === 'RED');
 
-    expect(evaluation.trustScore).toBeNull();
-    expect(evaluation.evidenceCoverage).toBe(0);
-    expect(evaluation.band).toBe('UNSCORED');
+    expect(rows).toHaveLength(18);
+    expect(redRows.map(row => row.agent.id).sort((a, b) => a - b)).toEqual([7, 12, 13]);
+  });
+
+  it('ranks scored agents by descending trust score and keeps ties stable', () => {
+    const ranked = rankAgentReviewRows(buildAgentReviewRows([]));
+    const scores = ranked.map(row => evaluateAgentTrust(row).trustScore ?? -1);
+
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    expect(ranked.slice(-3).map(row => row.agent.id)).toEqual([13, 12, 7]);
   });
 });
