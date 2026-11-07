@@ -140,8 +140,14 @@ export function buildAgentReviewRows(data: KPIRow[]): AgentReviewRow[] {
 
 export function rankAgentReviewRows(rows: AgentReviewRow[]): AgentReviewRow[] {
   return [...rows].sort((a, b) => {
-    const scoreA = evaluateAgentTrust(a).trustScore;
-    const scoreB = evaluateAgentTrust(b).trustScore;
+    const evaluationA = evaluateAgentTrust(a);
+    const evaluationB = evaluateAgentTrust(b);
+    const bandPriority = { RED: 0, AMBER: 1, GREEN: 2, UNSCORED: 3 };
+    const bandDifference = bandPriority[evaluationA.band] - bandPriority[evaluationB.band];
+    if (bandDifference !== 0) return bandDifference;
+
+    const scoreA = evaluationA.trustScore;
+    const scoreB = evaluationB.trustScore;
     if (scoreA == null && scoreB == null) return a.agent.id - b.agent.id;
     if (scoreA == null) return 1;
     if (scoreB == null) return -1;
