@@ -73,24 +73,37 @@ export type AgentTrustEvaluation = {
   band: TrustBand;
 };
 
-/** Only data-derived platform proxies are scored; absent agent-runtime telemetry stays unavailable. */
+/** Deterministic simulated telemetry supports demo scoring; it is not a live runtime feed. */
+export const AGENT_DEMO_TELEMETRY: Record<number, Record<TrustDimensionKey, number>> = {
+  1: { health: 96, performanceQuality: 90, behaviorDrift: 88, accessToolControl: 93, complianceRisk: 94, governanceAuditability: 97 },
+  2: { health: 91, performanceQuality: 88, behaviorDrift: 85, accessToolControl: 90, complianceRisk: 90, governanceAuditability: 92 },
+  3: { health: 95, performanceQuality: 91, behaviorDrift: 90, accessToolControl: 85, complianceRisk: 92, governanceAuditability: 95 },
+  4: { health: 86, performanceQuality: 84, behaviorDrift: 82, accessToolControl: 88, complianceRisk: 85, governanceAuditability: 90 },
+  5: { health: 88, performanceQuality: 82, behaviorDrift: 84, accessToolControl: 80, complianceRisk: 86, governanceAuditability: 88 },
+  6: { health: 82, performanceQuality: 78, behaviorDrift: 80, accessToolControl: 83, complianceRisk: 79, governanceAuditability: 85 },
+  7: { health: 38, performanceQuality: 45, behaviorDrift: 40, accessToolControl: 42, complianceRisk: 55, governanceAuditability: 50 },
+  8: { health: 92, performanceQuality: 90, behaviorDrift: 86, accessToolControl: 89, complianceRisk: 91, governanceAuditability: 94 },
+  9: { health: 84, performanceQuality: 86, behaviorDrift: 81, accessToolControl: 78, complianceRisk: 82, governanceAuditability: 85 },
+  10: { health: 80, performanceQuality: 77, behaviorDrift: 75, accessToolControl: 82, complianceRisk: 78, governanceAuditability: 80 },
+  11: { health: 89, performanceQuality: 92, behaviorDrift: 88, accessToolControl: 90, complianceRisk: 91, governanceAuditability: 87 },
+  12: { health: 35, performanceQuality: 40, behaviorDrift: 45, accessToolControl: 38, complianceRisk: 42, governanceAuditability: 50 },
+  13: { health: 42, performanceQuality: 48, behaviorDrift: 35, accessToolControl: 50, complianceRisk: 46, governanceAuditability: 52 },
+  14: { health: 78, performanceQuality: 74, behaviorDrift: 77, accessToolControl: 79, complianceRisk: 75, governanceAuditability: 82 },
+  15: { health: 81, performanceQuality: 76, behaviorDrift: 79, accessToolControl: 72, complianceRisk: 74, governanceAuditability: 80 },
+  16: { health: 86, performanceQuality: 80, behaviorDrift: 82, accessToolControl: 84, complianceRisk: 82, governanceAuditability: 85 },
+  17: { health: 73, performanceQuality: 70, behaviorDrift: 75, accessToolControl: 77, complianceRisk: 69, governanceAuditability: 76 },
+  18: { health: 80, performanceQuality: 82, behaviorDrift: 78, accessToolControl: 80, complianceRisk: 77, governanceAuditability: 84 },
+};
+
+/** Scores use the seeded demo telemetry across all dimensions; they do not imply live agent execution. */
 export function evaluateAgentTrust(row: AgentReviewRow): AgentTrustEvaluation {
-  const scores: Record<TrustDimensionKey, number | null> = {
+  const scores: Record<TrustDimensionKey, number | null> = AGENT_DEMO_TELEMETRY[row.agent.id] ?? {
     health: null,
-    performanceQuality: row.incidentCount > 0 ? (row.resolvedIncidents / row.incidentCount) * 100 : null,
+    performanceQuality: null,
     behaviorDrift: null,
     accessToolControl: null,
-    complianceRisk: row.records.length > 0
-      ? row.records.reduce((total, record) => total + ({
-        GREEN: 100,
-        AMBER: 70,
-        RED: 0,
-        GREY: 25,
-        BLUE: 85,
-        UNCONFIGURED: 0,
-      }[record.ragState] ?? 0), 0) / row.records.length
-      : null,
-    governanceAuditability: row.records.length > 0 ? (row.recordsWithLedger / row.records.length) * 100 : null,
+    complianceRisk: null,
+    governanceAuditability: null,
   };
 
   const scoredDimensions = TRUST_EVALUATION_DIMENSIONS.filter(({ key }) => scores[key] != null);
@@ -122,6 +135,17 @@ export function buildAgentReviewRows(data: KPIRow[]): AgentReviewRow[] {
       configuredRecords: records.filter(row => row.ragState !== 'UNCONFIGURED' && row.slaHistory.length > 0 && row.targetSLA > 0).length,
       notifiedRecords: records.filter(row => hasChaseStep(row, 'Notified')).length,
     };
+  });
+}
+
+export function rankAgentReviewRows(rows: AgentReviewRow[]): AgentReviewRow[] {
+  return [...rows].sort((a, b) => {
+    const scoreA = evaluateAgentTrust(a).trustScore;
+    const scoreB = evaluateAgentTrust(b).trustScore;
+    if (scoreA == null && scoreB == null) return a.agent.id - b.agent.id;
+    if (scoreA == null) return 1;
+    if (scoreB == null) return -1;
+    return scoreB - scoreA || a.agent.id - b.agent.id;
   });
 }
 

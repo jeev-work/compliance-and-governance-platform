@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Activity, AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, FileCheck2, Info, Search, ShieldCheck, X } from 'lucide-react';
 import { useFilters } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
-import { buildAgentReviewRows, evaluateAgentTrust, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type TrustDimensionKey } from '@/lib/agentReviewData';
+import { buildAgentReviewRows, evaluateAgentTrust, rankAgentReviewRows, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type TrustDimensionKey } from '@/lib/agentReviewData';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
@@ -19,12 +19,12 @@ const bandTone = {
 } as const;
 
 const dimensionNotes: Record<TrustDimensionKey, string> = {
-  health: 'Agent uptime, latency, and runtime errors are not available in this demo.',
-  performanceQuality: 'Resolved incident records ÷ related incident records. A platform-outcome proxy, not an agent quality measurement.',
-  behaviorDrift: 'Agent decisions, tool-use patterns, and drift telemetry are not available in this demo.',
-  accessToolControl: 'Agent tool-call and privilege audit records are not available in this demo.',
-  complianceRisk: 'Average platform-state proxy: GREEN 100, AMBER 70, BLUE 85, GREY 25, RED or UNCONFIGURED 0.',
-  governanceAuditability: 'KPI records with ledger evidence ÷ records in the agent’s data scope.',
+  health: 'Seeded demo values simulate availability, latency, and runtime-error health; no live feed is connected.',
+  performanceQuality: 'Seeded demo values simulate outcome quality; they are not measurements of actual agent decisions.',
+  behaviorDrift: 'Seeded demo values simulate behavior consistency and drift; no live behavior feed is connected.',
+  accessToolControl: 'Seeded demo values simulate access and tool-use controls; no live audit feed is connected.',
+  complianceRisk: 'Seeded demo values simulate compliance and risk posture; they are not live policy verdicts.',
+  governanceAuditability: 'Seeded demo values simulate governance and auditability; they are not live ledger measurements.',
 };
 
 function Metric({ icon: Icon, label, value, detail, tone = 'text-primary' }: { icon: typeof Activity; label: string; value: string; detail: string; tone?: string }) {
@@ -43,9 +43,10 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const monitoring = mode === 'monitoring';
 
-  const agentRows = useMemo(() => buildAgentReviewRows(filteredData), [filteredData]);
+  const agentRows = useMemo(() => rankAgentReviewRows(buildAgentReviewRows(filteredData)), [filteredData]);
   const summary = useMemo(() => summarizeAgentReview(agentRows), [agentRows]);
   const evaluations = useMemo(() => new Map(agentRows.map(row => [row.agent.id, evaluateAgentTrust(row)])), [agentRows]);
+  const redTrustRows = agentRows.filter(row => evaluations.get(row.agent.id)?.band === 'RED');
   const searchedRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? agentRows.filter(({ agent }) => `${agent.id} ${agent.name} ${agent.description}`.toLowerCase().includes(q)) : agentRows;
@@ -78,7 +79,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
             {monitoring
               ? 'Operational review derived from the filtered KPI and incident records.'
               : 'Oversight review of configuration, incident traceability, and ledger evidence in the filtered records.'}
-            {' '}Agent coverage is a platform-data proxy; this demo has no live agent run, latency, token, or policy-verdict telemetry.
+            {' '}Trust dimensions use seeded illustrative demo telemetry; operational counts remain derived from filtered platform records. Values are not live agent telemetry.
           </p>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="ml-auto h-8 w-8 shrink-0" aria-label="Close agent review">
@@ -107,9 +108,37 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
         </div>
       )}
 
+      {redTrustRows.length > 0 && (
+        <section className="border border-rag-red/40 bg-rag-red/10 px-3 py-2" aria-label="Agents requiring trust-score action">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <AlertTriangle className="h-4 w-4 text-rag-red" />
+            <h2 className="text-xs font-semibold text-rag-red">{redTrustRows.length} agents require action</h2>
+            <span className="text-[10px] text-muted-foreground">RED trust score · select an alert to review the agent</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {redTrustRows.map(row => {
+              const score = evaluations.get(row.agent.id)?.trustScore;
+              const recommendedAction = row.agent.id === 7
+                ? 'Review health telemetry'
+                : row.agent.id === 12
+                  ? 'Review access controls'
+                  : 'Investigate behavior drift';
+              return (
+                <Button key={row.agent.id} variant="outline" size="sm" onClick={() => setSelectedAgentId(row.agent.id)} className="h-auto min-h-8 justify-start gap-2 border-rag-red/40 bg-card px-2 py-1 text-left">
+                  <span className="font-mono text-rag-red">{score}</span>
+                  <span className="text-[10px] text-foreground">{row.agent.name}</span>
+                  <span className="text-[9px] text-muted-foreground">{recommendedAction}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-y border-border py-1.5 text-[10px] text-muted-foreground">
         <span><b className="text-foreground">{summary.observedAgents}</b> of {summary.modeledAgents} roles have a KPI/ledger proxy</span>
-        <span><b className="text-foreground">{summary.notInstrumentedAgents}</b> not measurable from current records</span>
+        <span><b className="text-foreground">{summary.notInstrumentedAgents}</b> have no KPI/ledger proxy</span>
+        <span><b className="text-foreground">{summary.modeledAgents}</b> receive seeded trust telemetry for this demo</span>
         <span><b className="text-foreground">{formatNumber(configuredCount)}</b> configured of {formatNumber(portfolioRows.length)} KPI records</span>
         <span className="ml-auto">Metrics follow the global filters above.</span>
       </div>
@@ -134,7 +163,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Score is the weighted average of available evidence only. Coverage shows the share of total weight backed by data. GREEN ≥80, AMBER 60–79, RED &lt;60. Proxy scores are not live agent telemetry.</p>
+                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Scores use seeded illustrative demo telemetry across all six dimensions. Values are mock data, not live agent runs or evidence of actual execution. GREEN ≥80, AMBER 60–79, RED &lt;60. Exactly three seeded agents are RED.</p>
               </PopoverContent>
             </Popover>
             <div className="relative ml-auto w-56 max-w-full">
@@ -190,13 +219,13 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
             <div className="p-3 space-y-2">
               <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
                 <div>
-                  <div className="text-[9px] text-muted-foreground">Evidence-backed trust score</div>
+                <div className="text-[9px] text-muted-foreground">Simulated weighted trust score</div>
                   <div className="mt-0.5"><TrustScoreCell score={evaluations.get(selected.agent.id)?.trustScore ?? null} coverage={evaluations.get(selected.agent.id)?.evidenceCoverage ?? 0} band={evaluations.get(selected.agent.id)?.band ?? 'UNSCORED'} signal={selected.agent.signal} /></div>
                 </div>
-                <span className="text-[9px] text-muted-foreground">{selected.agent.signal === 'proxy' ? 'Platform-data proxy' : 'Not instrumented'}</span>
+                <span className="text-[9px] text-muted-foreground">Simulated demo telemetry</span>
               </div>
               <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.description}</p>
-              <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.signalNote}</p>
+              <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.signalNote} Trust dimensions above are illustrative demo values, not live agent telemetry.</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
                   <EvaluationCell key={dimension.key} value={evaluations.get(selected.agent.id)?.scores[dimension.key] ?? null} note={dimensionNotes[dimension.key]} label={dimension.label} />
@@ -239,7 +268,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                 : 'Review configuration and event traceability without treating KPI records as proof of a live agent execution.'}</p>
               <div className="border-l-2 border-primary/50 pl-2 text-[10px] leading-4 text-muted-foreground">
                 <span className="font-semibold text-foreground">Interpretation boundary</span><br />
-                Proxy counts describe related KPI/case data only. Live agent uptime, latency, cost, model decisions, and policy compliance are not measured here.
+                Trust scores use seeded mock telemetry. KPI/case counts are platform records; neither is proof of live agent execution.
               </div>
               <div className="space-y-1">
                 <ReviewLine label="Configured KPI records" value={`${formatNumber(configuredCount)} / ${formatNumber(portfolioRows.length)}`} />
@@ -286,7 +315,7 @@ function TrustScoreCell({ score, coverage, band, signal }: { score: number | nul
             <span className={cn('inline-flex min-w-7 justify-center border px-1 py-0.5 font-mono text-[10px] font-semibold', bandTone[band])}>{score}</span>
             <span className={cn('text-[8px] font-semibold', band === 'GREEN' ? 'rag-green' : band === 'AMBER' ? 'rag-amber' : 'rag-red')}>{band}</span>
           </div>
-          <div className="mt-1 text-[8px] text-muted-foreground">{coverage}% weight backed</div>
+          <div className="mt-1 text-[8px] text-muted-foreground">{coverage}% weights populated</div>
         </>
       )}
     </div>
