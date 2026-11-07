@@ -54,6 +54,59 @@ export type AgentReviewRow = {
   notifiedRecords: number;
 };
 
+export const TRUST_EVALUATION_DIMENSIONS = [
+  { key: 'health', label: 'Agent health', weight: 10 },
+  { key: 'performanceQuality', label: 'Performance quality', weight: 15 },
+  { key: 'behaviorDrift', label: 'Behavior & drift', weight: 20 },
+  { key: 'accessToolControl', label: 'Access & tool control', weight: 15 },
+  { key: 'complianceRisk', label: 'Compliance & risk', weight: 30 },
+  { key: 'governanceAuditability', label: 'Governance & auditability', weight: 10 },
+] as const;
+
+export type TrustDimensionKey = typeof TRUST_EVALUATION_DIMENSIONS[number]['key'];
+export type TrustBand = 'GREEN' | 'AMBER' | 'RED' | 'UNSCORED';
+
+export type AgentTrustEvaluation = {
+  scores: Record<TrustDimensionKey, number | null>;
+  trustScore: number | null;
+  evidenceCoverage: number;
+  band: TrustBand;
+};
+
+/** Only data-derived platform proxies are scored; absent agent-runtime telemetry stays unavailable. */
+export function evaluateAgentTrust(row: AgentReviewRow): AgentTrustEvaluation {
+  const scores: Record<TrustDimensionKey, number | null> = {
+    health: null,
+    performanceQuality: row.incidentCount > 0 ? (row.resolvedIncidents / row.incidentCount) * 100 : null,
+    behaviorDrift: null,
+    accessToolControl: null,
+    complianceRisk: row.records.length > 0
+      ? row.records.reduce((total, record) => total + ({
+        GREEN: 100,
+        AMBER: 70,
+        RED: 0,
+        GREY: 25,
+        BLUE: 85,
+        UNCONFIGURED: 0,
+      }[record.ragState] ?? 0), 0) / row.records.length
+      : null,
+    governanceAuditability: row.records.length > 0 ? (row.recordsWithLedger / row.records.length) * 100 : null,
+  };
+
+  const scoredDimensions = TRUST_EVALUATION_DIMENSIONS.filter(({ key }) => scores[key] != null);
+  const evidenceCoverage = scoredDimensions.reduce((total, dimension) => total + dimension.weight, 0);
+  const trustScore = evidenceCoverage > 0
+    ? Math.round(scoredDimensions.reduce((total, dimension) => total + (scores[dimension.key] ?? 0) * dimension.weight, 0) / evidenceCoverage)
+    : null;
+
+  return {
+    scores,
+    trustScore,
+    evidenceCoverage,
+    band: trustScore == null ? 'UNSCORED' : trustScore >= 80 ? 'GREEN' : trustScore >= 60 ? 'AMBER' : 'RED',
+  };
+}
+
 export function buildAgentReviewRows(data: KPIRow[]): AgentReviewRow[] {
   return AGENT_CATALOG.map(agent => {
     const records = agent.signal === 'proxy' ? data.filter(agent.includes) : [];
