@@ -218,7 +218,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
             <div className="p-3 space-y-2">
               <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
                 <div>
-                  <div className="text-[9px] text-muted-foreground">Simulated weighted trust score</div>
+                <div className="text-[9px] text-muted-foreground">Simulated weighted trust score</div>
                   <div className="mt-0.5"><TrustScoreCell score={evaluations.get(selected.agent.id)?.trustScore ?? null} coverage={evaluations.get(selected.agent.id)?.evidenceCoverage ?? 0} band={evaluations.get(selected.agent.id)?.band ?? 'UNSCORED'} signal={selected.agent.signal} /></div>
                 </div>
                 <span className="text-[9px] text-muted-foreground">Simulated demo telemetry</span>
@@ -314,7 +314,7 @@ function TrustScoreCell({ score, coverage, band, signal }: { score: number | nul
             <span className={cn('inline-flex min-w-7 justify-center border px-1 py-0.5 font-mono text-[10px] font-semibold', bandTone[band])}>{score}</span>
             <span className={cn('text-[8px] font-semibold', band === 'GREEN' ? 'rag-green' : band === 'AMBER' ? 'rag-amber' : 'rag-red')}>{band}</span>
           </div>
-          <div className="mt-1 text-[8px] text-muted-foreground">{coverage}% weight backed</div>
+          <div className="mt-1 text-[8px] text-muted-foreground">{coverage}% weights populated</div>
         </>
       )}
     </div>
