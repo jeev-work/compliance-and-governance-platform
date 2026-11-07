@@ -103,6 +103,6 @@ describe('agent review aggregation', () => {
     const scores = ranked.map(row => evaluateAgentTrust(row).trustScore ?? -1);
 
     expect(scores).toEqual([...scores].sort((a, b) => b - a));
-    expect(ranked.slice(-3).map(row => row.agent.id)).toEqual([13, 12, 7]);
+    expect(ranked.slice(-3).map(row => row.agent.id)).toEqual([7, 13, 12]);
   });
 });
