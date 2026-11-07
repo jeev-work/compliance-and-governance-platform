@@ -4,7 +4,7 @@ import { useFilters } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
 import { buildAgentReviewRows, evaluateAgentTrust, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type TrustDimensionKey } from '@/lib/agentReviewData';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type ReviewMode = 'monitoring' | 'compliance';
 
@@ -119,13 +119,13 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
           <div className="flex items-center gap-2 px-1 pb-1.5">
             <h2 className="text-xs font-semibold text-foreground">Agent register</h2>
             <span className="text-[10px] text-muted-foreground">{searchedRows.length} of 18</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
+            <Popover>
+              <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Trust score weights and calculation">
                   <Info className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="start" className="max-w-80 p-3 text-[10px]">
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="start" className="w-80 p-3 text-[10px]">
                 <div className="font-semibold text-foreground">Weighted trust score</div>
                 <div className="mt-1 space-y-1">
                   {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
@@ -135,8 +135,8 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                   ))}
                 </div>
                 <p className="mt-2 border-t border-border pt-2 leading-relaxed">Score is the weighted average of available evidence only. Coverage shows the share of total weight backed by data. GREEN ≥80, AMBER 60–79, RED &lt;60. Proxy scores are not live agent telemetry.</p>
-              </TooltipContent>
-            </Tooltip>
+              </PopoverContent>
+            </Popover>
             <div className="relative ml-auto w-56 max-w-full">
               <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
               <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search agents" className="h-7 w-full border border-border bg-secondary pl-7 pr-2 text-[10px] text-foreground outline-none focus:border-primary" />
