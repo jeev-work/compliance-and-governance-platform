@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Activity, AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, FileCheck2, Info, Search, ShieldCheck, X } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ArrowUpRight, CheckCircle2, ClipboardList, FileCheck2, Info, Search, ShieldCheck, X } from 'lucide-react';
 import { useFilters } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
-import { buildAgentReviewRows, evaluateAgentTrust, rankAgentReviewRows, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type TrustDimensionKey } from '@/lib/agentReviewData';
+import { buildAgentReviewRows, evaluateAgentTrust, rankAgentReviewRows, sortAgentReviewRows, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type AgentReviewSortKey, type SortDirection, type TrustDimensionKey } from '@/lib/agentReviewData';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
@@ -41,6 +41,8 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
   const { filteredData, openDrilldown } = useFilters();
   const [query, setQuery] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
+  const [sortKey, setSortKey] = useState<AgentReviewSortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const monitoring = mode === 'monitoring';
 
   const agentRows = useMemo(() => rankAgentReviewRows(buildAgentReviewRows(filteredData)), [filteredData]);
@@ -51,7 +53,20 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
     const q = query.trim().toLowerCase();
     return q ? agentRows.filter(({ agent }) => `${agent.id} ${agent.name} ${agent.description}`.toLowerCase().includes(q)) : agentRows;
   }, [agentRows, query]);
+  const displayedRows = useMemo(
+    () => sortKey ? sortAgentReviewRows(searchedRows, sortKey, sortDirection) : searchedRows,
+    [searchedRows, sortKey, sortDirection],
+  );
   const selected = selectedAgentId == null ? null : agentRows.find(row => row.agent.id === selectedAgentId) ?? null;
+
+  const handleSort = (key: AgentReviewSortKey) => {
+    if (sortKey === key) {
+      setSortDirection(current => current === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortKey(key);
+    setSortDirection('asc');
+  };
 
   const portfolioRows = agentRows.find(row => row.agent.id === 1)?.records ?? [];
   const incidentRows = portfolioRows.filter(row => row.status === 'BREACHED' || row.chaseTimeline.length > 0 || row.ledgerEntries.some(entry => /Ticket Generated|Ticket Closed/i.test(entry.action)));
@@ -175,15 +190,21 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
             <table className="w-full min-w-[1180px] text-[10px]">
               <thead className="bg-secondary/70 text-muted-foreground">
                 <tr className="border-b border-border text-left">
-                  <th className="sticky left-0 z-10 min-w-44 bg-secondary px-2 py-2 font-medium">Agent</th>
+                  <th aria-sort={sortKey === 'agent' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'} className="sticky left-0 z-10 min-w-44 bg-secondary px-2 py-2 font-medium">
+                    <SortHeader label="Agent" active={sortKey === 'agent'} direction={sortDirection} onClick={() => handleSort('agent')} />
+                  </th>
                   {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
-                    <th key={dimension.key} className="min-w-32 px-2 py-2 font-medium leading-tight">{dimension.label}</th>
+                    <th key={dimension.key} aria-sort={sortKey === dimension.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'} className="min-w-32 px-2 py-2 font-medium leading-tight">
+                      <SortHeader label={dimension.label} active={sortKey === dimension.key} direction={sortDirection} onClick={() => handleSort(dimension.key)} />
+                    </th>
                   ))}
-                  <th className="min-w-28 px-2 py-2 font-medium">Trust score</th>
+                  <th aria-sort={sortKey === 'trustScore' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'} className="min-w-28 px-2 py-2 font-medium">
+                    <SortHeader label="Trust score" active={sortKey === 'trustScore'} direction={sortDirection} onClick={() => handleSort('trustScore')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {searchedRows.map(row => {
+                {displayedRows.map(row => {
                   const active = selectedAgentId === row.agent.id;
                   const evaluation = evaluations.get(row.agent.id);
                   return (
@@ -204,7 +225,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                     </tr>
                   );
                 })}
-                {searchedRows.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No agents match this search.</td></tr>}
+                {displayedRows.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No agents match this search.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -283,6 +304,22 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
         </aside>
       </div>
     </section>
+  );
+}
+
+function SortHeader({ label, active, direction, onClick }: { label: string; active: boolean; direction: SortDirection; onClick: () => void }) {
+  const SortIcon = active ? direction === 'asc' ? ArrowUp : ArrowDown : ArrowUpDown;
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      className="h-auto min-h-6 w-full justify-start gap-1 px-0 py-0 text-left text-[10px] font-medium leading-tight text-muted-foreground hover:text-foreground"
+      aria-label={`Sort by ${label}${active ? `, currently ${direction === 'asc' ? 'ascending' : 'descending'}` : ''}`}
+    >
+      <span>{label}</span>
+      <SortIcon className={cn('h-3 w-3 shrink-0', active && 'text-primary')} aria-hidden="true" />
+    </Button>
   );
 }
 

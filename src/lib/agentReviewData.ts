@@ -73,6 +73,9 @@ export type AgentTrustEvaluation = {
   band: TrustBand;
 };
 
+export type AgentReviewSortKey = 'agent' | TrustDimensionKey | 'trustScore';
+export type SortDirection = 'asc' | 'desc';
+
 /** Deterministic simulated telemetry supports demo scoring; it is not a live runtime feed. */
 export const AGENT_DEMO_TELEMETRY: Record<number, Record<TrustDimensionKey, number>> = {
   1: { health: 96, performanceQuality: 90, behaviorDrift: 88, accessToolControl: 93, complianceRisk: 94, governanceAuditability: 97 },
@@ -152,6 +155,26 @@ export function rankAgentReviewRows(rows: AgentReviewRow[]): AgentReviewRow[] {
     if (scoreA == null) return 1;
     if (scoreB == null) return -1;
     return scoreB - scoreA || a.agent.id - b.agent.id;
+  });
+}
+
+/** Sorts an agent register column while keeping unscored values at the bottom. */
+export function sortAgentReviewRows(rows: AgentReviewRow[], key: AgentReviewSortKey, direction: SortDirection): AgentReviewRow[] {
+  return [...rows].sort((a, b) => {
+    const evaluationA = evaluateAgentTrust(a);
+    const evaluationB = evaluateAgentTrust(b);
+    const valueA = key === 'agent' ? a.agent.name : key === 'trustScore' ? evaluationA.trustScore : evaluationA.scores[key];
+    const valueB = key === 'agent' ? b.agent.name : key === 'trustScore' ? evaluationB.trustScore : evaluationB.scores[key];
+
+    if (valueA == null && valueB == null) return a.agent.id - b.agent.id;
+    if (valueA == null) return 1;
+    if (valueB == null) return -1;
+
+    const comparison = typeof valueA === 'string' && typeof valueB === 'string'
+      ? valueA.localeCompare(valueB)
+      : Number(valueA) - Number(valueB);
+    if (comparison !== 0) return direction === 'asc' ? comparison : -comparison;
+    return a.agent.id - b.agent.id;
   });
 }
 
