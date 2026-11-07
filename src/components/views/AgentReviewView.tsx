@@ -150,7 +150,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                   {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
                     <th key={dimension.key} className="min-w-32 px-2 py-2 font-medium leading-tight">{dimension.label}</th>
                   ))}
-                  <th className="sticky right-0 z-10 min-w-28 bg-secondary px-2 py-2 font-medium">Trust score</th>
+                  <th className="min-w-28 px-2 py-2 font-medium">Trust score</th>
                 </tr>
               </thead>
               <tbody>
@@ -169,7 +169,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                           <EvaluationCell value={evaluation?.scores[dimension.key] ?? null} note={dimensionNotes[dimension.key]} />
                         </td>
                       ))}
-                      <td className={cn('sticky right-0 z-[1] bg-card px-2 py-2 align-middle', active && 'bg-accent')}>
+                      <td className="px-2 py-2 align-middle">
                         <TrustScoreCell score={evaluation?.trustScore ?? null} coverage={evaluation?.evidenceCoverage ?? 0} band={evaluation?.band ?? 'UNSCORED'} signal={row.agent.signal} />
                       </td>
                     </tr>
