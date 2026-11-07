@@ -137,7 +137,8 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-y border-border py-1.5 text-[10px] text-muted-foreground">
         <span><b className="text-foreground">{summary.observedAgents}</b> of {summary.modeledAgents} roles have a KPI/ledger proxy</span>
-        <span><b className="text-foreground">{summary.notInstrumentedAgents}</b> not measurable from current records</span>
+        <span><b className="text-foreground">{summary.notInstrumentedAgents}</b> have no KPI/ledger proxy</span>
+        <span><b className="text-foreground">{summary.modeledAgents}</b> receive seeded trust telemetry for this demo</span>
         <span><b className="text-foreground">{formatNumber(configuredCount)}</b> configured of {formatNumber(portfolioRows.length)} KPI records</span>
         <span className="ml-auto">Metrics follow the global filters above.</span>
       </div>
