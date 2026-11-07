@@ -95,6 +95,7 @@ describe('agent review aggregation', () => {
     const redRows = rows.filter(row => evaluateAgentTrust(row).band === 'RED');
 
     expect(rows).toHaveLength(18);
+    expect(rows.every(row => evaluateAgentTrust(row).trustScore != null && evaluateAgentTrust(row).evidenceCoverage === 100)).toBe(true);
     expect(redRows.map(row => row.agent.id).sort((a, b) => a - b)).toEqual([7, 12, 13]);
   });
 
