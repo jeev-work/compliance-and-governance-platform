@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KPIRow } from '@/lib/mockData';
-import { buildAgentReviewRows, evaluateAgentTrust, rankAgentReviewRows, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS } from '@/lib/agentReviewData';
+import { buildAgentReviewRows, evaluateAgentTrust, rankAgentReviewRows, sortAgentReviewRows, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type AgentReviewSortKey } from '@/lib/agentReviewData';
 
 function makeRow(overrides: Partial<KPIRow> = {}): KPIRow {
   return {
@@ -111,6 +111,42 @@ describe('agent review aggregation', () => {
     for (let index = 1; index < evaluations.length; index += 1) {
       if (evaluations[index]?.band === evaluations[index - 1]?.band) {
         expect(evaluations[index - 1]?.trustScore).toBeGreaterThanOrEqual(evaluations[index]?.trustScore ?? -1);
+      }
+    }
+  });
+
+  it('supports ascending and descending sorting for every agent register column', () => {
+    const rows = buildAgentReviewRows([]);
+    const sortKeys: AgentReviewSortKey[] = ['agent', ...TRUST_EVALUATION_DIMENSIONS.map(dimension => dimension.key), 'trustScore'];
+    const valueFor = (key: AgentReviewSortKey, row: ReturnType<typeof buildAgentReviewRows>[number]) => {
+      const evaluation = evaluateAgentTrust(row);
+      return key === 'agent' ? row.agent.name : key === 'trustScore' ? evaluation.trustScore : evaluation.scores[key];
+    };
+
+    for (const key of sortKeys) {
+      const ascending = sortAgentReviewRows(rows, key, 'asc');
+      const descending = sortAgentReviewRows(rows, key, 'desc');
+      expect(ascending).toHaveLength(18);
+      expect(descending).toHaveLength(18);
+      for (let index = 1; index < ascending.length; index += 1) {
+        const previousRow = ascending[index - 1];
+        const currentRow = ascending[index];
+        const descendingPreviousRow = descending[index - 1];
+        const descendingCurrentRow = descending[index];
+        if (!previousRow || !currentRow || !descendingPreviousRow || !descendingCurrentRow) {
+          throw new Error('Expected sorted agent rows at each index');
+        }
+        const previous = valueFor(key, previousRow);
+        const current = valueFor(key, currentRow);
+        expect(typeof previous === 'string' && typeof current === 'string'
+          ? previous.localeCompare(current) <= 0
+          : Number(previous) <= Number(current)).toBe(true);
+
+        const descendingPrevious = valueFor(key, descendingPreviousRow);
+        const descendingCurrent = valueFor(key, descendingCurrentRow);
+        expect(typeof descendingPrevious === 'string' && typeof descendingCurrent === 'string'
+          ? descendingPrevious.localeCompare(descendingCurrent) >= 0
+          : Number(descendingPrevious) >= Number(descendingCurrent)).toBe(true);
       }
     }
   });
