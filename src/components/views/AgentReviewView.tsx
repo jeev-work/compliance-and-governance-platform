@@ -1,15 +1,31 @@
 import { useMemo, useState } from 'react';
-import { Activity, AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, FileCheck2, Search, ShieldCheck, X } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, FileCheck2, Info, Search, ShieldCheck, X } from 'lucide-react';
 import { useFilters } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
-import { buildAgentReviewRows, summarizeAgentReview } from '@/lib/agentReviewData';
+import { buildAgentReviewRows, evaluateAgentTrust, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type TrustDimensionKey } from '@/lib/agentReviewData';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type ReviewMode = 'monitoring' | 'compliance';
 
 const formatNumber = (value: number) => value.toLocaleString();
 const formatPercent = (value: number, total: number) => total ? `${((value / total) * 100).toFixed(1)}%` : '—';
 const showTime = (value: number | null) => value == null ? '—' : value < 60 ? `${Math.round(value)}m` : `${Math.floor(value / 60)}h ${Math.round(value % 60)}m`;
+const bandTone = {
+  GREEN: 'text-rag-green border-rag-green bg-rag-green',
+  AMBER: 'text-rag-amber border-rag-amber bg-rag-amber',
+  RED: 'text-rag-red border-rag-red bg-rag-red',
+  UNSCORED: 'text-muted-foreground border-border bg-secondary',
+} as const;
+
+const dimensionNotes: Record<TrustDimensionKey, string> = {
+  health: 'Agent uptime, latency, and runtime errors are not available in this demo.',
+  performanceQuality: 'Resolved incident records ÷ related incident records. A platform-outcome proxy, not an agent quality measurement.',
+  behaviorDrift: 'Agent decisions, tool-use patterns, and drift telemetry are not available in this demo.',
+  accessToolControl: 'Agent tool-call and privilege audit records are not available in this demo.',
+  complianceRisk: 'Average platform-state proxy: GREEN 100, AMBER 70, BLUE 85, GREY 25, RED or UNCONFIGURED 0.',
+  governanceAuditability: 'KPI records with ledger evidence ÷ records in the agent’s data scope.',
+};
 
 function Metric({ icon: Icon, label, value, detail, tone = 'text-primary' }: { icon: typeof Activity; label: string; value: string; detail: string; tone?: string }) {
   return (
@@ -29,6 +45,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
 
   const agentRows = useMemo(() => buildAgentReviewRows(filteredData), [filteredData]);
   const summary = useMemo(() => summarizeAgentReview(agentRows), [agentRows]);
+  const evaluations = useMemo(() => new Map(agentRows.map(row => [row.agent.id, evaluateAgentTrust(row)])), [agentRows]);
   const searchedRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? agentRows.filter(({ agent }) => `${agent.id} ${agent.name} ${agent.description}`.toLowerCase().includes(q)) : agentRows;
@@ -97,49 +114,68 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
         <span className="ml-auto">Metrics follow the global filters above.</span>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.78fr)] gap-3 items-start">
+      <div className="grid grid-cols-1 gap-3 items-start">
         <div className="min-w-0">
           <div className="flex items-center gap-2 px-1 pb-1.5">
             <h2 className="text-xs font-semibold text-foreground">Agent register</h2>
             <span className="text-[10px] text-muted-foreground">{searchedRows.length} of 18</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Trust score weights and calculation">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="start" className="w-80 p-3 text-[10px]">
+                <div className="font-semibold text-foreground">Weighted trust score</div>
+                <div className="mt-1 space-y-1">
+                  {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
+                    <div key={dimension.key} className="flex justify-between gap-6">
+                      <span>{dimension.label}</span><span className="font-mono text-foreground">{dimension.weight}%</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Score is the weighted average of available evidence only. Coverage shows the share of total weight backed by data. GREEN ≥80, AMBER 60–79, RED &lt;60. Proxy scores are not live agent telemetry.</p>
+              </PopoverContent>
+            </Popover>
             <div className="relative ml-auto w-56 max-w-full">
               <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
               <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search agents" className="h-7 w-full border border-border bg-secondary pl-7 pr-2 text-[10px] text-foreground outline-none focus:border-primary" />
             </div>
           </div>
           <div className="border border-border bg-card overflow-x-auto scrollbar-thin">
-            <table className="w-full min-w-[760px] text-[10px]">
+            <table className="w-full min-w-[1180px] text-[10px]">
               <thead className="bg-secondary/70 text-muted-foreground">
                 <tr className="border-b border-border text-left">
-                  <th className="px-2 py-1.5 font-medium">Agent</th>
-                  <th className="px-2 py-1.5 font-medium">Operational purpose</th>
-                  <th className="px-2 py-1.5 font-medium text-right">KPI scope</th>
-                  <th className="px-2 py-1.5 font-medium text-right">Exceptions</th>
-                  <th className="px-2 py-1.5 font-medium">Signal</th>
+                  <th className="sticky left-0 z-10 min-w-44 bg-secondary px-2 py-2 font-medium">Agent</th>
+                  {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
+                    <th key={dimension.key} className="min-w-32 px-2 py-2 font-medium leading-tight">{dimension.label}</th>
+                  ))}
+                  <th className="min-w-28 px-2 py-2 font-medium">Trust score</th>
                 </tr>
               </thead>
               <tbody>
                 {searchedRows.map(row => {
                   const active = selectedAgentId === row.agent.id;
+                  const evaluation = evaluations.get(row.agent.id);
                   return (
                     <tr key={row.agent.id} className={cn('border-b border-border/60 last:border-0', active && 'bg-accent/50')}>
-                      <td className="px-2 py-1.5 align-top">
+                      <td className={cn('sticky left-0 z-[1] bg-card px-2 py-2 align-middle', active && 'bg-accent')}>
                         <button className="text-left font-semibold text-primary hover:underline" onClick={() => setSelectedAgentId(active ? null : row.agent.id)}>
-                          <span className="font-mono text-muted-foreground mr-1.5">{String(row.agent.id).padStart(2, '0')}</span>{row.agent.name}
+                          <span className="font-mono text-muted-foreground mr-1.5">{String(row.agent.id).padStart(2, '0')}</span><span className="leading-tight">{row.agent.name}</span>
                         </button>
                       </td>
-                      <td className="px-2 py-1.5 text-muted-foreground leading-snug">{row.agent.description}</td>
-                      <td className="px-2 py-1.5 text-right font-mono text-foreground">{row.agent.signal === 'proxy' ? formatNumber(row.records.length) : '—'}</td>
-                      <td className="px-2 py-1.5 text-right font-mono">{row.agent.signal === 'proxy' ? formatNumber(row.activeExceptions) : '—'}</td>
-                      <td className="px-2 py-1.5">
-                        <span className={cn('inline-flex items-center border px-1.5 py-0.5 text-[9px]', row.agent.signal === 'proxy' ? 'border-primary/40 text-primary' : 'border-border text-muted-foreground')}>
-                          {row.agent.signal === 'proxy' ? 'KPI / ledger proxy' : 'Not instrumented'}
-                        </span>
+                      {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
+                        <td key={dimension.key} className="px-2 py-2 align-middle">
+                          <EvaluationCell value={evaluation?.scores[dimension.key] ?? null} note={dimensionNotes[dimension.key]} />
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 align-middle">
+                        <TrustScoreCell score={evaluation?.trustScore ?? null} coverage={evaluation?.evidenceCoverage ?? 0} band={evaluation?.band ?? 'UNSCORED'} signal={row.agent.signal} />
                       </td>
                     </tr>
                   );
                 })}
-                {searchedRows.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">No agents match this search.</td></tr>}
+                {searchedRows.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No agents match this search.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -152,7 +188,20 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
           </div>
           {selected ? (
             <div className="p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+                <div>
+                  <div className="text-[9px] text-muted-foreground">Evidence-backed trust score</div>
+                  <div className="mt-0.5"><TrustScoreCell score={evaluations.get(selected.agent.id)?.trustScore ?? null} coverage={evaluations.get(selected.agent.id)?.evidenceCoverage ?? 0} band={evaluations.get(selected.agent.id)?.band ?? 'UNSCORED'} signal={selected.agent.signal} /></div>
+                </div>
+                <span className="text-[9px] text-muted-foreground">{selected.agent.signal === 'proxy' ? 'Platform-data proxy' : 'Not instrumented'}</span>
+              </div>
+              <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.description}</p>
               <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.signalNote}</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
+                  <EvaluationCell key={dimension.key} value={evaluations.get(selected.agent.id)?.scores[dimension.key] ?? null} note={dimensionNotes[dimension.key]} label={dimension.label} />
+                ))}
+              </div>
               {selected.agent.signal === 'proxy' ? (
                 <>
                   <div className="grid grid-cols-2 gap-2">
@@ -205,6 +254,42 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
         </aside>
       </div>
     </section>
+  );
+}
+
+function EvaluationCell({ value, note, label }: { value: number | null; note: string; label?: string }) {
+  const tone = value == null ? 'bg-secondary' : value >= 80 ? 'bg-rag-green' : value >= 60 ? 'bg-rag-amber' : 'bg-rag-red';
+  return (
+    <div className="min-w-0" title={`${label ? `${label}: ` : ''}${value == null ? 'Not instrumented. ' : `${Math.round(value)}% evidence proxy. `}${note}`}>
+      {label && <div className="mb-1 text-[9px] leading-tight text-muted-foreground">{label}</div>}
+      <div className="flex items-center gap-1.5">
+        <div className="h-1.5 min-w-8 flex-1 overflow-hidden bg-secondary">
+          {value != null && <div className={cn('h-full', tone)} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />}
+        </div>
+        <span className={cn('w-8 shrink-0 text-right font-mono text-[9px]', value == null ? 'text-muted-foreground' : value >= 80 ? 'rag-green' : value >= 60 ? 'rag-amber' : 'rag-red')}>
+          {value == null ? '—' : `${Math.round(value)}%`}
+        </span>
+      </div>
+      {value == null && <div className="mt-0.5 text-[8px] text-muted-foreground">No telemetry</div>}
+    </div>
+  );
+}
+
+function TrustScoreCell({ score, coverage, band, signal }: { score: number | null; coverage: number; band: 'GREEN' | 'AMBER' | 'RED' | 'UNSCORED'; signal: 'proxy' | 'not-instrumented' }) {
+  return (
+    <div className="min-w-24">
+      {score == null ? (
+        <span className="text-[9px] text-muted-foreground">{signal === 'not-instrumented' ? 'Not scored' : 'No evidence'}</span>
+      ) : (
+        <>
+          <div className="flex items-center gap-1.5">
+            <span className={cn('inline-flex min-w-7 justify-center border px-1 py-0.5 font-mono text-[10px] font-semibold', bandTone[band])}>{score}</span>
+            <span className={cn('text-[8px] font-semibold', band === 'GREEN' ? 'rag-green' : band === 'AMBER' ? 'rag-amber' : 'rag-red')}>{band}</span>
+          </div>
+          <div className="mt-1 text-[8px] text-muted-foreground">{coverage}% weight backed</div>
+        </>
+      )}
+    </div>
   );
 }
 

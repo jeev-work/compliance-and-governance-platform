@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KPIRow } from '@/lib/mockData';
-import { buildAgentReviewRows, summarizeAgentReview } from '@/lib/agentReviewData';
+import { buildAgentReviewRows, evaluateAgentTrust, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS } from '@/lib/agentReviewData';
 
 function makeRow(overrides: Partial<KPIRow> = {}): KPIRow {
   return {
@@ -70,5 +70,33 @@ describe('agent review aggregation', () => {
     const summary = summarizeAgentReview(buildAgentReviewRows([unconfigured]));
 
     expect(summary.configuredRecords).toBe(0);
+  });
+
+  it('uses the supplied evaluation weights and reports evidence-backed weighted trust only', () => {
+    expect(TRUST_EVALUATION_DIMENSIONS.reduce((total, item) => total + item.weight, 0)).toBe(100);
+
+    const row = buildAgentReviewRows([makeRow()]).find(item => item.agent.id === 1);
+    if (!row) throw new Error('Continuous Monitoring Agent row was not built');
+    const evaluation = evaluateAgentTrust(row);
+
+    expect(evaluation.evidenceCoverage).toBe(55);
+    expect(evaluation.scores.performanceQuality).toBe(0);
+    expect(evaluation.scores.complianceRisk).toBe(0);
+    expect(evaluation.scores.governanceAuditability).toBe(100);
+    expect(evaluation.scores.health).toBeNull();
+    expect(evaluation.scores.behaviorDrift).toBeNull();
+    expect(evaluation.scores.accessToolControl).toBeNull();
+    expect(evaluation.trustScore).toBe(18);
+    expect(evaluation.band).toBe('RED');
+  });
+
+  it('leaves trust unscored when no agent telemetry or scoped records exist', () => {
+    const agent = buildAgentReviewRows([]).find(item => item.agent.id === 7);
+    if (!agent) throw new Error('Agent Health row was not built');
+    const evaluation = evaluateAgentTrust(agent);
+
+    expect(evaluation.trustScore).toBeNull();
+    expect(evaluation.evidenceCoverage).toBe(0);
+    expect(evaluation.band).toBe('UNSCORED');
   });
 });
