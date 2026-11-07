@@ -19,12 +19,12 @@ const bandTone = {
 } as const;
 
 const dimensionNotes: Record<TrustDimensionKey, string> = {
-  health: 'Agent uptime, latency, and runtime errors are not available in this demo.',
-  performanceQuality: 'Resolved incident records ÷ related incident records. A platform-outcome proxy, not an agent quality measurement.',
-  behaviorDrift: 'Agent decisions, tool-use patterns, and drift telemetry are not available in this demo.',
-  accessToolControl: 'Agent tool-call and privilege audit records are not available in this demo.',
-  complianceRisk: 'Average platform-state proxy: GREEN 100, AMBER 70, BLUE 85, GREY 25, RED or UNCONFIGURED 0.',
-  governanceAuditability: 'KPI records with ledger evidence ÷ records in the agent’s data scope.',
+  health: 'Seeded demo values simulate availability, latency, and runtime-error health; no live feed is connected.',
+  performanceQuality: 'Seeded demo values simulate outcome quality; they are not measurements of actual agent decisions.',
+  behaviorDrift: 'Seeded demo values simulate behavior consistency and drift; no live behavior feed is connected.',
+  accessToolControl: 'Seeded demo values simulate access and tool-use controls; no live audit feed is connected.',
+  complianceRisk: 'Seeded demo values simulate compliance and risk posture; they are not live policy verdicts.',
+  governanceAuditability: 'Seeded demo values simulate governance and auditability; they are not live ledger measurements.',
 };
 
 function Metric({ icon: Icon, label, value, detail, tone = 'text-primary' }: { icon: typeof Activity; label: string; value: string; detail: string; tone?: string }) {
@@ -162,7 +162,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Scores use seeded illustrative demo telemetry across all six dimensions. Values are mock data, not live agent runs or evidence of actual execution. GREEN ≥80, AMBER 60–79, RED &lt;60.</p>
+                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Scores use seeded illustrative demo telemetry across all six dimensions. Values are mock data, not live agent runs or evidence of actual execution. GREEN ≥80, AMBER 60–79, RED &lt;60. Exactly three seeded agents are RED.</p>
               </PopoverContent>
             </Popover>
             <div className="relative ml-auto w-56 max-w-full">
@@ -218,13 +218,13 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
             <div className="p-3 space-y-2">
               <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
                 <div>
-                  <div className="text-[9px] text-muted-foreground">Evidence-backed trust score</div>
+                  <div className="text-[9px] text-muted-foreground">Simulated weighted trust score</div>
                   <div className="mt-0.5"><TrustScoreCell score={evaluations.get(selected.agent.id)?.trustScore ?? null} coverage={evaluations.get(selected.agent.id)?.evidenceCoverage ?? 0} band={evaluations.get(selected.agent.id)?.band ?? 'UNSCORED'} signal={selected.agent.signal} /></div>
                 </div>
                 <span className="text-[9px] text-muted-foreground">Simulated demo telemetry</span>
               </div>
               <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.description}</p>
-              <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.signalNote}</p>
+              <p className="text-[10px] leading-4 text-muted-foreground">{selected.agent.signalNote} Trust dimensions above are illustrative demo values, not live agent telemetry.</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {TRUST_EVALUATION_DIMENSIONS.map(dimension => (
                   <EvaluationCell key={dimension.key} value={evaluations.get(selected.agent.id)?.scores[dimension.key] ?? null} note={dimensionNotes[dimension.key]} label={dimension.label} />
