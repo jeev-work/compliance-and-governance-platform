@@ -99,11 +99,19 @@ describe('agent review aggregation', () => {
     expect(redRows.map(row => row.agent.id).sort((a, b) => a - b)).toEqual([7, 12, 13]);
   });
 
-  it('ranks scored agents by descending trust score and keeps ties stable', () => {
+  it('shows RED agents first, then sorts each trust band by descending score', () => {
     const ranked = rankAgentReviewRows(buildAgentReviewRows([]));
-    const scores = ranked.map(row => evaluateAgentTrust(row).trustScore ?? -1);
+    const evaluations = ranked.map(row => evaluateAgentTrust(row));
+    const bands = evaluations.map(evaluation => evaluation.band);
+    const bandPriority = { RED: 0, AMBER: 1, GREEN: 2, UNSCORED: 3 };
 
-    expect(scores).toEqual([...scores].sort((a, b) => b - a));
-    expect(ranked.slice(-3).map(row => row.agent.id)).toEqual([7, 13, 12]);
+    expect(bands.slice(0, 3)).toEqual(['RED', 'RED', 'RED']);
+    expect(ranked.slice(0, 3).map(row => row.agent.id)).toEqual([7, 13, 12]);
+    expect(bands).toEqual([...bands].sort((a, b) => bandPriority[a] - bandPriority[b]));
+    for (let index = 1; index < evaluations.length; index += 1) {
+      if (evaluations[index]?.band === evaluations[index - 1]?.band) {
+        expect(evaluations[index - 1]?.trustScore).toBeGreaterThanOrEqual(evaluations[index]?.trustScore ?? -1);
+      }
+    }
   });
 });
