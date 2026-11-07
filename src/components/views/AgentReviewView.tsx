@@ -114,7 +114,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
         <span className="ml-auto">Metrics follow the global filters above.</span>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.78fr)] gap-3 items-start">
+      <div className="grid grid-cols-1 gap-3 items-start">
         <div className="min-w-0">
           <div className="flex items-center gap-2 px-1 pb-1.5">
             <h2 className="text-xs font-semibold text-foreground">Agent register</h2>
