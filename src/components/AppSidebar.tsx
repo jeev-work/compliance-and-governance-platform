@@ -1,4 +1,4 @@
-import { Shield, LayoutDashboard, LineChart, Wrench, Flag, FileCheck, ServerCog, Siren, Play, Activity, Workflow, Network, ShieldCheck } from 'lucide-react';
+import { Shield, LayoutDashboard, LineChart, Wrench, Flag, FileCheck, ServerCog, Siren, Play, Activity, Workflow, Network, ShieldCheck, TowerControl } from 'lucide-react';
 import { useFilters, Role } from '@/lib/filterContext';
 import { cn } from '@/lib/utils';
 import { KPIRow, RagState, Severity } from '@/lib/mockData';
@@ -15,6 +15,7 @@ type Scenario = {
   pick?: (rows: KPIRow[]) => KPIRow | undefined;
   wallboard?: boolean;
   agentReview?: 'monitoring' | 'compliance';
+  controlTower?: boolean;
 };
 
 const SCENARIOS: Scenario[] = [
@@ -72,9 +73,14 @@ const SCENARIOS: Scenario[] = [
     blurb: 'Configuration · case traceability · evidence',
     agentReview: 'compliance',
   },
+  {
+    id: 's11', num: 11, label: 'Control Tower', icon: TowerControl,
+    blurb: 'Agent trust · critical process health · recovery',
+    controlTower: true,
+  },
 ];
 
-export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecycle, activeLifecycle, onLeaveLifecycle, onLaunchAgentReview, activeAgentReview, onLeaveAgentReview }: {
+export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecycle, activeLifecycle, onLeaveLifecycle, onLaunchAgentReview, activeAgentReview, onLeaveAgentReview, onLaunchControlTower, activeControlTower, onLeaveControlTower }: {
   onLaunchWallboard: () => void;
   activeWallboard: boolean;
   onLaunchLifecycle: () => void;
@@ -83,6 +89,9 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
   onLaunchAgentReview: (mode: 'monitoring' | 'compliance') => void;
   activeAgentReview: 'monitoring' | 'compliance' | null;
   onLeaveAgentReview: () => void;
+  onLaunchControlTower: () => void;
+  activeControlTower: boolean;
+  onLeaveControlTower: () => void;
 }) {
   const { filters, setFilters, allData, openDrilldown, closeDrilldown } = useFilters();
 
@@ -90,8 +99,10 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
     if (s.wallboard) { onLeaveAgentReview(); onLaunchWallboard(); return; }
     if (s.id === 's8') { onLaunchLifecycle(); onLeaveAgentReview(); return; }
     if (s.agentReview) { onLaunchAgentReview(s.agentReview); return; }
+    if (s.controlTower) { onLaunchControlTower(); return; }
     onLeaveLifecycle();
     onLeaveAgentReview();
+    onLeaveControlTower();
 
     setFilters(f => ({
       ...f,
@@ -119,7 +130,7 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
         <Shield className="h-5 w-5 text-primary shrink-0" />
         <div className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="text-xs font-semibold text-sidebar-accent-foreground">GovShield</div>
-          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Demo Screens · 10</div>
+          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Demo Screens · 11</div>
         </div>
       </div>
 
@@ -131,7 +142,9 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
               ? activeLifecycle
               : s.agentReview
                 ? activeAgentReview === s.agentReview
-              : (filters.role === s.role && !activeWallboard && !activeLifecycle && !activeAgentReview);
+                : s.controlTower
+                  ? activeControlTower
+                  : (filters.role === s.role && !activeWallboard && !activeLifecycle && !activeAgentReview && !activeControlTower);
           return (
             <button
               key={s.id}

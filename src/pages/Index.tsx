@@ -9,6 +9,7 @@ import { ComplianceView } from '@/components/views/ComplianceView';
 import { AdminHealthView } from '@/components/views/AdminHealthView';
 import { KpiLifecycleView } from '@/components/views/KpiLifecycleView';
 import { AgentReviewView } from '@/components/views/AgentReviewView';
+import { ControlTowerView } from '@/components/views/ControlTowerView';
 import { DrilldownPanel } from '@/components/DrilldownPanel';
 import { KpiHistoryPanel } from '@/components/KpiHistoryPanel';
 import { NotificationPanel } from '@/components/NotificationPanel';
@@ -20,18 +21,22 @@ function DashboardContent() {
   const [wallboardOpen, setWallboardOpen] = useState(false);
   const [lifecycleOpen, setLifecycleOpen] = useState(false);
   const [agentReview, setAgentReview] = useState<'monitoring' | 'compliance' | null>(null);
+  const [controlTowerOpen, setControlTowerOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen w-full">
       <AppSidebar
-        onLaunchWallboard={() => { setWallboardOpen(true); setLifecycleOpen(false); setAgentReview(null); }}
+        onLaunchWallboard={() => { setWallboardOpen(true); setLifecycleOpen(false); setAgentReview(null); setControlTowerOpen(false); }}
         activeWallboard={wallboardOpen}
-        onLaunchLifecycle={() => { setLifecycleOpen(true); setWallboardOpen(false); setAgentReview(null); }}
+        onLaunchLifecycle={() => { setLifecycleOpen(true); setWallboardOpen(false); setAgentReview(null); setControlTowerOpen(false); }}
         activeLifecycle={lifecycleOpen}
         onLeaveLifecycle={() => setLifecycleOpen(false)}
-        onLaunchAgentReview={(mode) => { setAgentReview(mode); setLifecycleOpen(false); setWallboardOpen(false); }}
+        onLaunchAgentReview={(mode) => { setAgentReview(mode); setLifecycleOpen(false); setWallboardOpen(false); setControlTowerOpen(false); }}
         activeAgentReview={agentReview}
         onLeaveAgentReview={() => setAgentReview(null)}
+        onLaunchControlTower={() => { setControlTowerOpen(true); setLifecycleOpen(false); setWallboardOpen(false); setAgentReview(null); }}
+        activeControlTower={controlTowerOpen}
+        onLeaveControlTower={() => setControlTowerOpen(false)}
       />
       <div className="flex-1 flex flex-col min-w-0">
         <GlobalFilterBar />
@@ -40,6 +45,8 @@ function DashboardContent() {
             <KpiLifecycleView onClose={() => setLifecycleOpen(false)} />
           ) : agentReview ? (
             <AgentReviewView mode={agentReview} onClose={() => setAgentReview(null)} />
+          ) : controlTowerOpen ? (
+            <ControlTowerView onClose={() => setControlTowerOpen(false)} />
           ) : (
             <>
               <KpiHistoryPanel />
