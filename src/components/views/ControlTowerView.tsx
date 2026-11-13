@@ -42,6 +42,7 @@ export function ControlTowerView({ onClose }: { onClose: () => void }) {
   const displayProcesses = useMemo(() => SERVICE_PROCESSES.map((process, index) => ({ ...process, health: serviceHealth[index] ?? process.health })).sort((a, b) => serviceSort === 'health' ? a.health - b.health : a.name.localeCompare(b.name)), [serviceHealth, serviceSort]);
   const platformAverage = Math.round(platformHealth.reduce((sum, item) => sum + item.health, 0) / Math.max(1, platformHealth.length));
   const redAgents = CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'RED');
+  const amberAgents = CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'AMBER');
 
   return (
     <section className="space-y-3" aria-label="Control Tower">
@@ -64,16 +65,28 @@ export function ControlTowerView({ onClose }: { onClose: () => void }) {
         <SummaryMetric icon={Workflow} label="Service processes" value="10" detail="Operations & service journeys" tone="rag-green" />
       </div>
 
-      {redAgents.length > 0 && (
-        <section className="border border-rag-red/40 bg-rag-red/10 px-3 py-2" aria-label="Trust action alerts">
+      {(redAgents.length > 0 || amberAgents.length > 0) && (
+        <section className="space-y-2" aria-label="Trust score alerts and watch zone">
+          {redAgents.length > 0 && <div className="border border-rag-red/40 bg-rag-red/10 px-3 py-2" aria-label="Trust action alerts">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <AlertTriangle className="h-4 w-4 text-rag-red" />
-            <h2 className="text-xs font-semibold text-rag-red">Trust score action required</h2>
+            <h2 className="text-xs font-semibold text-rag-red">Stop and re-evaluate · {redAgents.length} agents</h2>
             <span className="text-[10px] text-muted-foreground">Review the seeded low-scoring agents</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {redAgents.map(agent => <Button key={agent.id} variant="outline" size="sm" onClick={() => setSelectedAgent(agent)} className="h-7 gap-2 border-rag-red/40 bg-card px-2 text-[10px]"><span className="font-mono text-rag-red">{agent.trustScore}</span>{agent.name}<ArrowRight className="h-3 w-3" /></Button>)}
           </div>
+          </div>}
+          {amberAgents.length > 0 && <div className="border border-rag-amber/40 bg-rag-amber/10 px-3 py-2" aria-label="Amber watch zone">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <AlertTriangle className="h-4 w-4 text-rag-amber" />
+              <h2 className="text-xs font-semibold text-rag-amber">Amber watch zone · {amberAgents.length} agents</h2>
+              <span className="text-[10px] text-muted-foreground">Monitor closely and review before trust declines</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {amberAgents.map(agent => <Button key={agent.id} variant="outline" size="sm" onClick={() => setSelectedAgent(agent)} className="h-7 gap-2 border-rag-amber/40 bg-card px-2 text-[10px]"><span className="font-mono text-rag-amber">{agent.trustScore}</span>{agent.name}<ArrowRight className="h-3 w-3" /></Button>)}
+            </div>
+          </div>}
         </section>
       )}
 

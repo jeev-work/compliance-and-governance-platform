@@ -15,6 +15,12 @@ describe('control tower demo catalogue', () => {
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'RED').length).toBeGreaterThan(0);
   });
 
+  it('keeps exactly two agents in the RED action zone and six in the AMBER watch zone', () => {
+    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'RED')).toHaveLength(2);
+    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'AMBER')).toHaveLength(6);
+    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'GREEN')).toHaveLength(47);
+  });
+
   it('randomizes platform process health within the requested 85–99 range', () => {
     expect(randomPlatformHealth(() => 0)).toBe(85);
     expect(randomPlatformHealth(() => 0.99999)).toBe(99);

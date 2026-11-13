@@ -85,11 +85,24 @@ const weightedTrustScore = (index: number, groupOffset: number) => {
   return Math.round(dimensions.reduce((sum, item) => sum + item.score * item.weight, 0) / 100);
 };
 
+const redAgentIds = new Set(['compliance-1', 'platform-1']);
+const amberAgentScores: Record<string, number> = {
+  'compliance-2': 66,
+  'compliance-3': 72,
+  'platform-2': 64,
+  'platform-3': 75,
+  'data-quality-1': 68,
+  'data-quality-2': 77,
+};
+
 const toRows = (names: string[], group: ControlTowerGroup, sourceType: 'Agent' | 'Platform', offset: number) =>
   names.map((name, index): ControlTowerAgent => {
-    const trustScore = [0, 1, 2, 3].includes(index) ? 52 + index * 2 : weightedTrustScore(index, offset);
+    const id = `${group}-${index + 1}`;
+    const trustScore = redAgentIds.has(id)
+      ? 54 + index * 2
+      : amberAgentScores[id] ?? Math.max(80, weightedTrustScore(index, offset));
     return {
-      id: `${group}-${index + 1}`,
+      id,
       name,
       group,
       sourceType,
