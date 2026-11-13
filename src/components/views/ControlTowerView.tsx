@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, ArrowDown, ArrowRight, BellRing, CheckCircle2, ChevronDown, ChevronUp, Clock3, Database, Gauge, Network, RotateCcw, ShieldCheck, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { CONTROL_TOWER_AGENTS, randomPlatformHealth, SERVICE_PROCESSES, type ControlTowerAgent, type ControlTowerGroup } from '@/lib/controlTowerData';
 
@@ -22,6 +24,12 @@ export function ControlTowerView({ onClose }: { onClose: () => void }) {
   const [serviceSort, setServiceSort] = useState<'health' | 'name'>('health');
   const [recoveryExpanded, setRecoveryExpanded] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<ControlTowerAgent | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Record<ControlTowerGroup, boolean>>({ compliance: true, platform: true, 'data-quality': true });
+  const [groupFilters, setGroupFilters] = useState<Record<ControlTowerGroup, { query: string; sourceType: string; band: string }>>({
+    compliance: { query: '', sourceType: 'all', band: 'all' },
+    platform: { query: '', sourceType: 'all', band: 'all' },
+    'data-quality': { query: '', sourceType: 'all', band: 'all' },
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -77,27 +85,52 @@ export function ControlTowerView({ onClose }: { onClose: () => void }) {
         </div>
         <div className="grid grid-cols-1 gap-2 2xl:grid-cols-3">
           {groups.map(group => {
-            const agents = CONTROL_TOWER_AGENTS.filter(agent => agent.group === group.id);
+            const filters = groupFilters[group.id];
+            const agents = CONTROL_TOWER_AGENTS.filter(agent => {
+              if (agent.group !== group.id) return false;
+              if (filters.query && !agent.name.toLowerCase().includes(filters.query.trim().toLowerCase())) return false;
+              if (filters.sourceType !== 'all' && agent.sourceType !== filters.sourceType) return false;
+              if (filters.band !== 'all' && agent.band !== filters.band) return false;
+              return true;
+            });
+            const isExpanded = expandedGroups[group.id];
             return (
               <section key={group.id} className="min-w-0 border border-border bg-card" aria-label={group.title}>
-                <header className="flex items-center gap-2 border-b border-border bg-secondary/50 px-2.5 py-2">
-                  <div className="min-w-0 flex-1"><h3 className="text-[11px] font-semibold text-foreground">{group.title}</h3><p className="text-[9px] text-muted-foreground">{group.subtitle}</p></div>
-                  <span className="font-mono text-[9px] text-muted-foreground">{group.count}</span>
+                <header className="border-b border-border bg-secondary/50">
+                  <button type="button" className="flex w-full items-center gap-2 px-2.5 py-2 text-left" aria-expanded={isExpanded} aria-controls={`agent-register-${group.id}`} onClick={() => setExpandedGroups(current => ({ ...current, [group.id]: !current[group.id] }))}>
+                    <div className="min-w-0 flex-1"><h3 className="text-[11px] font-semibold text-foreground">{group.title}</h3><p className="text-[9px] text-muted-foreground">{group.subtitle}</p></div>
+                    <span className="font-mono text-[9px] text-muted-foreground">{agents.length}/{group.count}</span>
+                    {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </button>
                 </header>
-                <div className="max-h-[340px] overflow-y-auto scrollbar-thin">
-                  <table className="w-full text-[9px]">
-                    <thead className="sticky top-0 bg-secondary/90 text-muted-foreground"><tr className="text-left"><th className="px-2 py-1.5 font-medium">Agent</th><th className="px-1 py-1.5 font-medium">Type</th><th className="px-2 py-1.5 text-right font-medium">Trust</th></tr></thead>
-                    <tbody>{agents.map(agent => {
-                      const health = platformHealth.find(item => item.id === agent.id)?.health;
-                      return <tr key={agent.id} className="border-t border-border/60 hover:bg-accent/40">
-                        <td className="px-2 py-1.5"><button onClick={() => setSelectedAgent(agent)} className="text-left font-medium text-foreground hover:text-primary">{agent.name}</button></td>
-                        <td className="px-1 py-1.5 text-muted-foreground">{agent.sourceType}</td>
-                        <td className="px-2 py-1.5 text-right"><span className={cn('inline-flex min-w-10 items-center justify-center gap-1 border px-1.5 py-0.5 font-mono font-semibold', bandClass[agent.band])}>{agent.trustScore}<span className="text-[7px]">{agent.band}</span></span>{health != null && <div className="mt-0.5 text-[8px] text-muted-foreground">Health {health}%</div>}</td>
-                      </tr>;
-                    })}</tbody>
-                  </table>
-                </div>
-                {group.id === 'platform' && <div className="flex items-center gap-1.5 border-t border-border px-2.5 py-1.5 text-[8px] text-muted-foreground"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rag-green" /> Health values refresh every 30 seconds · illustrative simulation</div>}
+                {isExpanded && <div id={`agent-register-${group.id}`}>
+                  <div className="grid grid-cols-1 gap-1.5 border-b border-border px-2 py-2 sm:grid-cols-[minmax(0,1fr)_88px_88px]">
+                    <Input aria-label={`Search ${group.title}`} placeholder="Filter agents…" value={filters.query} onChange={event => setGroupFilters(current => ({ ...current, [group.id]: { ...current[group.id], query: event.target.value } }))} className="h-7 min-w-0 text-[9px]" />
+                    <Select value={filters.sourceType} onValueChange={sourceType => setGroupFilters(current => ({ ...current, [group.id]: { ...current[group.id], sourceType } }))}>
+                      <SelectTrigger aria-label={`Filter ${group.title} by type`} className="h-7 text-[9px]"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="all" className="text-xs">All types</SelectItem><SelectItem value="Agent" className="text-xs">Agent</SelectItem><SelectItem value="Platform" className="text-xs">Platform</SelectItem></SelectContent>
+                    </Select>
+                    <Select value={filters.band} onValueChange={band => setGroupFilters(current => ({ ...current, [group.id]: { ...current[group.id], band } }))}>
+                      <SelectTrigger aria-label={`Filter ${group.title} by trust`} className="h-7 text-[9px]"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="all" className="text-xs">All trust</SelectItem><SelectItem value="RED" className="text-xs">RED</SelectItem><SelectItem value="AMBER" className="text-xs">AMBER</SelectItem><SelectItem value="GREEN" className="text-xs">GREEN</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                  <div className="max-h-[340px] overflow-y-auto scrollbar-thin">
+                    <table className="w-full text-[9px]">
+                      <thead className="sticky top-0 bg-secondary/90 text-muted-foreground"><tr className="text-left"><th className="px-2 py-1.5 font-medium">Agent</th><th className="px-1 py-1.5 font-medium">Type</th><th className="px-2 py-1.5 text-right font-medium">Trust</th></tr></thead>
+                      <tbody>{agents.map(agent => {
+                        const health = platformHealth.find(item => item.id === agent.id)?.health;
+                        return <tr key={agent.id} className="border-t border-border/60 hover:bg-accent/40">
+                          <td className="px-2 py-1.5"><button onClick={() => setSelectedAgent(agent)} className="text-left font-medium text-foreground hover:text-primary">{agent.name}</button></td>
+                          <td className="px-1 py-1.5 text-muted-foreground">{agent.sourceType}</td>
+                          <td className="px-2 py-1.5 text-right"><span className={cn('inline-flex min-w-10 items-center justify-center gap-1 border px-1.5 py-0.5 font-mono font-semibold', bandClass[agent.band])}>{agent.trustScore}<span className="text-[7px]">{agent.band}</span></span>{health != null && <div className="mt-0.5 text-[8px] text-muted-foreground">Health {health}%</div>}</td>
+                        </tr>;
+                      })}</tbody>
+                    </table>
+                    {agents.length === 0 && <p className="px-2 py-4 text-center text-[9px] text-muted-foreground">No agents match these filters.</p>}
+                  </div>
+                  {group.id === 'platform' && <div className="flex items-center gap-1.5 border-t border-border px-2.5 py-1.5 text-[8px] text-muted-foreground"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rag-green" /> Health values refresh every 30 seconds · illustrative simulation</div>}
+                </div>}
               </section>
             );
           })}

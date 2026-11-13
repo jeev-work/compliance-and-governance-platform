@@ -9,3 +9,5 @@
 - [x] Add interactive ascending/descending sorting to every agent-register column.
 - [x] Add dashboard 11 Control Tower with grouped trust-scored agent registers, 30-second platform health simulation, top-ten process health, and contingency-recovery alert scenario.
 - [x] Verify catalogue counts, trust-score rules, process coverage, and recovery scenario in preview.
+- [x] Add independent search, source-type and trust-band filters plus collapsible headers to all three Control Tower agent groups.
+- [x] Verify section filtering and collapse behavior in the live preview.
