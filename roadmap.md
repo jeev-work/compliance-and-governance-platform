@@ -13,3 +13,4 @@
 - [x] Verify section filtering and collapse behavior in the live preview.
 - [x] Set dashboard 11 to exactly two RED action agents and six AMBER watch agents, with explicit alert groups.
 - [x] Verify exact trust-band counts in tests and the live preview.
+- [x] Add the uploaded Service Agents catalogue as a trust-scored, filterable, collapsible section above Compliance Agents.

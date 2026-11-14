@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CONTROL_TOWER_AGENTS, dataQualityNames, randomPlatformHealth, SERVICE_PROCESSES } from '@/lib/controlTowerData';
+import { CONTROL_TOWER_AGENTS, dataQualityNames, randomPlatformHealth, SERVICE_PROCESSES, serviceAgentNames } from '@/lib/controlTowerData';
 
 describe('control tower demo catalogue', () => {
   it('contains 20 compliance, 19 platform, and 16 data quality records from the supplied lists', () => {
+    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.group === 'service')).toHaveLength(112);
+    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.group === 'service').map(agent => agent.name)).toEqual(serviceAgentNames);
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.group === 'compliance')).toHaveLength(20);
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.group === 'platform')).toHaveLength(19);
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.group === 'data-quality')).toHaveLength(16);
@@ -18,7 +20,7 @@ describe('control tower demo catalogue', () => {
   it('keeps exactly two agents in the RED action zone and six in the AMBER watch zone', () => {
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'RED')).toHaveLength(2);
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'AMBER')).toHaveLength(6);
-    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'GREEN')).toHaveLength(47);
+    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'GREEN')).toHaveLength(159);
   });
 
   it('randomizes platform process health within the requested 85–99 range', () => {

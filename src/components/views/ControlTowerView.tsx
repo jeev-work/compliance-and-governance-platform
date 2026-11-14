@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { CONTROL_TOWER_AGENTS, randomPlatformHealth, SERVICE_PROCESSES, type ControlTowerAgent, type ControlTowerGroup } from '@/lib/controlTowerData';
 
 const groups: { id: ControlTowerGroup; title: string; subtitle: string; count: string }[] = [
+  { id: 'service', title: 'Service Agents', subtitle: 'Customer service & operations agents', count: '112 AGENTS' },
   { id: 'compliance', title: 'Compliance Agents', subtitle: 'Agent oversight & control execution', count: '20 AGENTS' },
   { id: 'platform', title: 'Platform Agents', subtitle: 'Core platform operations', count: '19 AGENTS' },
   { id: 'data-quality', title: 'Data Quality Agents', subtitle: 'Pipeline integrity & quality controls', count: '16 AGENTS' },
@@ -24,8 +25,9 @@ export function ControlTowerView({ onClose }: { onClose: () => void }) {
   const [serviceSort, setServiceSort] = useState<'health' | 'name'>('health');
   const [recoveryExpanded, setRecoveryExpanded] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<ControlTowerAgent | null>(null);
-  const [expandedGroups, setExpandedGroups] = useState<Record<ControlTowerGroup, boolean>>({ compliance: true, platform: true, 'data-quality': true });
+  const [expandedGroups, setExpandedGroups] = useState<Record<ControlTowerGroup, boolean>>({ service: true, compliance: true, platform: true, 'data-quality': true });
   const [groupFilters, setGroupFilters] = useState<Record<ControlTowerGroup, { query: string; sourceType: string; band: string }>>({
+    service: { query: '', sourceType: 'all', band: 'all' },
     compliance: { query: '', sourceType: 'all', band: 'all' },
     platform: { query: '', sourceType: 'all', band: 'all' },
     'data-quality': { query: '', sourceType: 'all', band: 'all' },
@@ -59,7 +61,7 @@ export function ControlTowerView({ onClose }: { onClose: () => void }) {
       </header>
 
       <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-        <SummaryMetric icon={Activity} label="Agent estate" value="55" detail="20 compliance · 19 platform · 16 data quality" />
+        <SummaryMetric icon={Activity} label="Agent estate" value="167" detail="112 service · 20 compliance · 19 platform · 16 data quality" />
         <SummaryMetric icon={Gauge} label="Platform process health" value={`${platformAverage}%`} detail="Randomized demo values · refresh every 30 seconds" />
         <SummaryMetric icon={AlertTriangle} label="RED trust alerts" value={String(redAgents.length)} detail="Agents requiring review" tone="rag-red" />
         <SummaryMetric icon={Workflow} label="Service processes" value="10" detail="Operations & service journeys" tone="rag-green" />
