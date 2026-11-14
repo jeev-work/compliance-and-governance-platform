@@ -132,11 +132,10 @@ export function ControlTowerView({ onClose }: { onClose: () => void }) {
                     <table className="w-full text-[9px]">
                       <thead className="sticky top-0 bg-secondary/90 text-muted-foreground"><tr className="text-left"><th className="px-2 py-1.5 font-medium">Agent</th><th className="px-1 py-1.5 font-medium">Type</th><th className="px-2 py-1.5 text-right font-medium">Trust</th></tr></thead>
                       <tbody>{agents.map(agent => {
-                        const health = platformHealth.find(item => item.id === agent.id)?.health;
                         return <tr key={agent.id} className="border-t border-border/60 hover:bg-accent/40">
                           <td className="px-2 py-1.5"><button onClick={() => setSelectedAgent(agent)} className="text-left font-medium text-foreground hover:text-primary">{agent.name}</button></td>
                           <td className="px-1 py-1.5 text-muted-foreground">{agent.sourceType}</td>
-                          <td className="px-2 py-1.5 text-right"><span className={cn('inline-flex min-w-10 items-center justify-center gap-1 border px-1.5 py-0.5 font-mono font-semibold', bandClass[agent.band])}>{agent.trustScore}<span className="text-[7px]">{agent.band}</span></span>{health != null && <div className="mt-0.5 text-[8px] text-muted-foreground">Health {health}%</div>}</td>
+                          <td className="px-2 py-1.5 text-right"><span className={cn('inline-flex min-w-10 items-center justify-center gap-1 border px-1.5 py-0.5 font-mono font-semibold', bandClass[agent.band])}>{agent.trustScore}<span className="text-[7px]">{agent.band}</span></span></td>
                         </tr>;
                       })}</tbody>
                     </table>
