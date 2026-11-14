@@ -204,6 +204,10 @@ const weightedTrustScore = (index: number, groupOffset: number) => {
 
 const redAgentIds = new Set(['compliance-1', 'platform-1']);
 const amberAgentScores: Record<string, number> = {
+  'service-2': 94,
+  'service-14': 93,
+  'service-31': 92,
+  'service-54': 90,
   'compliance-2': 90,
   'compliance-3': 91,
   'platform-2': 92,

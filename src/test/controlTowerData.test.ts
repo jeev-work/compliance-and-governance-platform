@@ -18,10 +18,21 @@ describe('control tower demo catalogue', () => {
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'RED').length).toBeGreaterThan(0);
   });
 
-  it('keeps exactly two agents in the RED action zone and six in the AMBER watch zone', () => {
+  it('keeps exactly two agents in the RED action zone and ten in the AMBER watch zone', () => {
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'RED')).toHaveLength(2);
-    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'AMBER')).toHaveLength(6);
-    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'GREEN')).toHaveLength(159);
+    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'AMBER')).toHaveLength(10);
+    expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'GREEN')).toHaveLength(155);
+  });
+
+  it('places four named Service Agents in the AMBER watch zone', () => {
+    const amberServiceAgents = CONTROL_TOWER_AGENTS.filter(agent => agent.group === 'service' && agent.band === 'AMBER');
+    expect(amberServiceAgents.map(agent => agent.name)).toEqual([
+      'Relationship selection',
+      'General fulfilment',
+      'Statement of Account',
+      'Refund execution',
+    ]);
+    expect(amberServiceAgents.map(agent => agent.trustScore)).toEqual([94, 93, 92, 90]);
   });
 
   it('classifies trust scores at the requested inclusive boundaries', () => {
