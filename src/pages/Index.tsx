@@ -10,6 +10,7 @@ import { AdminHealthView } from '@/components/views/AdminHealthView';
 import { KpiLifecycleView } from '@/components/views/KpiLifecycleView';
 import { AgentReviewView } from '@/components/views/AgentReviewView';
 import { ControlTowerView } from '@/components/views/ControlTowerView';
+import { ControlTowerCopyView } from '@/components/views/ControlTowerCopyView';
 import { DrilldownPanel } from '@/components/DrilldownPanel';
 import { KpiHistoryPanel } from '@/components/KpiHistoryPanel';
 import { NotificationPanel } from '@/components/NotificationPanel';
@@ -22,6 +23,7 @@ function DashboardContent() {
   const [lifecycleOpen, setLifecycleOpen] = useState(false);
   const [agentReview, setAgentReview] = useState<'monitoring' | 'compliance' | null>(null);
   const [controlTowerOpen, setControlTowerOpen] = useState(false);
+  const [controlTowerCopyOpen, setControlTowerCopyOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen w-full">
@@ -37,11 +39,16 @@ function DashboardContent() {
         onLaunchControlTower={() => { setControlTowerOpen(true); setLifecycleOpen(false); setWallboardOpen(false); setAgentReview(null); }}
         activeControlTower={controlTowerOpen}
         onLeaveControlTower={() => setControlTowerOpen(false)}
+        onLaunchControlTowerCopy={() => { setControlTowerCopyOpen(true); setControlTowerOpen(false); setLifecycleOpen(false); setWallboardOpen(false); setAgentReview(null); }}
+        activeControlTowerCopy={controlTowerCopyOpen}
+        onLeaveControlTowerCopy={() => setControlTowerCopyOpen(false)}
       />
       <div className="flex-1 flex flex-col min-w-0">
         <GlobalFilterBar />
         <main className="flex-1 p-3 overflow-y-auto scrollbar-thin">
-          {lifecycleOpen ? (
+          {controlTowerCopyOpen ? (
+            <ControlTowerCopyView onClose={() => setControlTowerCopyOpen(false)} />
+          ) : lifecycleOpen ? (
             <KpiLifecycleView onClose={() => setLifecycleOpen(false)} />
           ) : agentReview ? (
             <AgentReviewView mode={agentReview} onClose={() => setAgentReview(null)} />

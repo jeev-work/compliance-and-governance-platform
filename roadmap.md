@@ -15,3 +15,5 @@
 - [x] Verify exact trust-band counts in tests and the live preview.
 - [x] Add the uploaded Service Agents catalogue as a trust-scored, filterable, collapsible section above Compliance Agents.
 - [x] Seed four Service Agents in AMBER and update dashboard trust-band totals and tests.
+- [x] Create Screen 12 with a separate Control Tower view and demo catalogue, preserving Screen 11.
+- [x] Verify Screen 12 navigation, filters, details, and independent data, and confirm Screen 11 remains unchanged.

@@ -16,6 +16,7 @@ type Scenario = {
   wallboard?: boolean;
   agentReview?: 'monitoring' | 'compliance';
   controlTower?: boolean;
+  controlTowerCopy?: boolean;
 };
 
 const SCENARIOS: Scenario[] = [
@@ -78,9 +79,14 @@ const SCENARIOS: Scenario[] = [
     blurb: 'Agent trust · critical process health · recovery',
     controlTower: true,
   },
+  {
+    id: 's12', num: 12, label: 'Control Tower — Independent Copy', icon: TowerControl,
+    blurb: 'Agent trust · critical process health · recovery',
+    controlTowerCopy: true,
+  },
 ];
 
-export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecycle, activeLifecycle, onLeaveLifecycle, onLaunchAgentReview, activeAgentReview, onLeaveAgentReview, onLaunchControlTower, activeControlTower, onLeaveControlTower }: {
+export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecycle, activeLifecycle, onLeaveLifecycle, onLaunchAgentReview, activeAgentReview, onLeaveAgentReview, onLaunchControlTower, activeControlTower, onLeaveControlTower, onLaunchControlTowerCopy, activeControlTowerCopy, onLeaveControlTowerCopy }: {
   onLaunchWallboard: () => void;
   activeWallboard: boolean;
   onLaunchLifecycle: () => void;
@@ -92,10 +98,15 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
   onLaunchControlTower: () => void;
   activeControlTower: boolean;
   onLeaveControlTower: () => void;
+  onLaunchControlTowerCopy: () => void;
+  activeControlTowerCopy: boolean;
+  onLeaveControlTowerCopy: () => void;
 }) {
   const { filters, setFilters, allData, openDrilldown, closeDrilldown } = useFilters();
 
   const runScenario = (s: Scenario) => {
+    if (s.controlTowerCopy) { onLaunchControlTowerCopy(); return; }
+    onLeaveControlTowerCopy();
     if (s.wallboard) { onLeaveAgentReview(); onLaunchWallboard(); return; }
     if (s.id === 's8') { onLaunchLifecycle(); onLeaveAgentReview(); return; }
     if (s.agentReview) { onLaunchAgentReview(s.agentReview); return; }
@@ -130,7 +141,7 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
         <Shield className="h-5 w-5 text-primary shrink-0" />
         <div className="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="text-xs font-semibold text-sidebar-accent-foreground">GovShield</div>
-          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Demo Screens · 11</div>
+          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Demo Screens · 12</div>
         </div>
       </div>
 
@@ -144,7 +155,9 @@ export function AppSidebar({ onLaunchWallboard, activeWallboard, onLaunchLifecyc
                 ? activeAgentReview === s.agentReview
                 : s.controlTower
                   ? activeControlTower
-                  : (filters.role === s.role && !activeWallboard && !activeLifecycle && !activeAgentReview && !activeControlTower);
+                  : s.controlTowerCopy
+                    ? activeControlTowerCopy
+                    : (filters.role === s.role && !activeWallboard && !activeLifecycle && !activeAgentReview && !activeControlTower && !activeControlTowerCopy);
           return (
             <button
               key={s.id}
