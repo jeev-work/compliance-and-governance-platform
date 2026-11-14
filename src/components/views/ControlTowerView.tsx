@@ -96,7 +96,7 @@ export function ControlTowerView({ onClose }: { onClose: () => void }) {
         <div className="flex items-center gap-2 border-b border-border pb-1.5">
           <ShieldCheck className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold">Monitoring agents · trust scores</h2>
-          <span className="ml-auto text-[10px] text-muted-foreground">Weighted illustrative score · GREEN ≥80 · AMBER 60–79 · RED &lt;60</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">Weighted illustrative score · GREEN ≥95 · AMBER 90–94 · RED &lt;90</span>
         </div>
         <div className="grid grid-cols-1 gap-2 2xl:grid-cols-3">
           {groups.map(group => {

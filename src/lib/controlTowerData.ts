@@ -1,3 +1,5 @@
+import { trustBandForScore } from '@/lib/trustScore';
+
 export type ControlTowerGroup = 'service' | 'compliance' | 'platform' | 'data-quality';
 
 export type ControlTowerAgent = {
@@ -202,12 +204,12 @@ const weightedTrustScore = (index: number, groupOffset: number) => {
 
 const redAgentIds = new Set(['compliance-1', 'platform-1']);
 const amberAgentScores: Record<string, number> = {
-  'compliance-2': 66,
-  'compliance-3': 72,
-  'platform-2': 64,
-  'platform-3': 75,
-  'data-quality-1': 68,
-  'data-quality-2': 77,
+  'compliance-2': 90,
+  'compliance-3': 91,
+  'platform-2': 92,
+  'platform-3': 93,
+  'data-quality-1': 94,
+  'data-quality-2': 90,
 };
 
 const toRows = (names: string[], group: ControlTowerGroup, sourceType: 'Agent' | 'Platform', offset: number) =>
@@ -215,14 +217,14 @@ const toRows = (names: string[], group: ControlTowerGroup, sourceType: 'Agent' |
     const id = `${group}-${index + 1}`;
     const trustScore = redAgentIds.has(id)
       ? 54 + index * 2
-      : amberAgentScores[id] ?? Math.max(80, weightedTrustScore(index, offset));
+      : amberAgentScores[id] ?? Math.max(95, weightedTrustScore(index, offset));
     return {
       id,
       name,
       group,
       sourceType,
       trustScore,
-      band: trustScore >= 80 ? 'GREEN' : trustScore >= 60 ? 'AMBER' : 'RED',
+      band: trustBandForScore(trustScore),
     };
   });
 

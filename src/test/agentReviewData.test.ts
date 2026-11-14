@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { KPIRow } from '@/lib/mockData';
 import { buildAgentReviewRows, evaluateAgentTrust, rankAgentReviewRows, sortAgentReviewRows, summarizeAgentReview, TRUST_EVALUATION_DIMENSIONS, type AgentReviewSortKey } from '@/lib/agentReviewData';
+import { trustBandForScore } from '@/lib/trustScore';
 
 function makeRow(overrides: Partial<KPIRow> = {}): KPIRow {
   return {
@@ -80,13 +81,13 @@ describe('agent review aggregation', () => {
     const evaluation = evaluateAgentTrust(row);
 
     expect(evaluation.evidenceCoverage).toBe(100);
-    expect(evaluation.scores.performanceQuality).toBe(90);
-    expect(evaluation.scores.complianceRisk).toBe(94);
+    expect(evaluation.scores.performanceQuality).toBe(96);
+    expect(evaluation.scores.complianceRisk).toBe(96);
     expect(evaluation.scores.governanceAuditability).toBe(97);
-    expect(evaluation.scores.health).toBe(96);
-    expect(evaluation.scores.behaviorDrift).toBe(88);
-    expect(evaluation.scores.accessToolControl).toBe(93);
-    expect(evaluation.trustScore).toBe(93);
+    expect(evaluation.scores.health).toBe(97);
+    expect(evaluation.scores.behaviorDrift).toBe(95);
+    expect(evaluation.scores.accessToolControl).toBe(98);
+    expect(evaluation.trustScore).toBe(96);
     expect(evaluation.band).toBe('GREEN');
   });
 
@@ -97,6 +98,15 @@ describe('agent review aggregation', () => {
     expect(rows).toHaveLength(18);
     expect(rows.every(row => evaluateAgentTrust(row).trustScore != null && evaluateAgentTrust(row).evidenceCoverage === 100)).toBe(true);
     expect(redRows.map(row => row.agent.id).sort((a, b) => a - b)).toEqual([7, 12, 13]);
+    expect(rows.filter(row => evaluateAgentTrust(row).band === 'AMBER')).toHaveLength(6);
+    expect(rows.filter(row => evaluateAgentTrust(row).band === 'GREEN')).toHaveLength(9);
+  });
+
+  it('applies the shared trust-band boundaries exactly', () => {
+    expect(trustBandForScore(89)).toBe('RED');
+    expect(trustBandForScore(90)).toBe('AMBER');
+    expect(trustBandForScore(94)).toBe('AMBER');
+    expect(trustBandForScore(95)).toBe('GREEN');
   });
 
   it('shows RED agents first, then sorts each trust band by descending score', () => {

@@ -1,4 +1,5 @@
 import type { KPIRow } from '@/lib/mockData';
+import { trustBandForScore } from '@/lib/trustScore';
 
 export type AgentSignal = 'proxy' | 'not-instrumented';
 
@@ -78,24 +79,24 @@ export type SortDirection = 'asc' | 'desc';
 
 /** Deterministic simulated telemetry supports demo scoring; it is not a live runtime feed. */
 export const AGENT_DEMO_TELEMETRY: Record<number, Record<TrustDimensionKey, number>> = {
-  1: { health: 96, performanceQuality: 90, behaviorDrift: 88, accessToolControl: 93, complianceRisk: 94, governanceAuditability: 97 },
-  2: { health: 91, performanceQuality: 88, behaviorDrift: 85, accessToolControl: 90, complianceRisk: 90, governanceAuditability: 92 },
-  3: { health: 95, performanceQuality: 91, behaviorDrift: 90, accessToolControl: 85, complianceRisk: 92, governanceAuditability: 95 },
-  4: { health: 86, performanceQuality: 84, behaviorDrift: 82, accessToolControl: 88, complianceRisk: 85, governanceAuditability: 90 },
-  5: { health: 88, performanceQuality: 82, behaviorDrift: 84, accessToolControl: 80, complianceRisk: 86, governanceAuditability: 88 },
-  6: { health: 82, performanceQuality: 78, behaviorDrift: 80, accessToolControl: 83, complianceRisk: 79, governanceAuditability: 85 },
+  1: { health: 97, performanceQuality: 96, behaviorDrift: 95, accessToolControl: 98, complianceRisk: 96, governanceAuditability: 97 },
+  2: { health: 92, performanceQuality: 93, behaviorDrift: 91, accessToolControl: 94, complianceRisk: 92, governanceAuditability: 93 },
+  3: { health: 98, performanceQuality: 96, behaviorDrift: 97, accessToolControl: 95, complianceRisk: 98, governanceAuditability: 96 },
+  4: { health: 90, performanceQuality: 92, behaviorDrift: 93, accessToolControl: 91, complianceRisk: 94, governanceAuditability: 92 },
+  5: { health: 91, performanceQuality: 90, behaviorDrift: 94, accessToolControl: 92, complianceRisk: 93, governanceAuditability: 91 },
+  6: { health: 92, performanceQuality: 91, behaviorDrift: 90, accessToolControl: 93, complianceRisk: 94, governanceAuditability: 92 },
   7: { health: 38, performanceQuality: 45, behaviorDrift: 40, accessToolControl: 42, complianceRisk: 55, governanceAuditability: 50 },
-  8: { health: 92, performanceQuality: 90, behaviorDrift: 86, accessToolControl: 89, complianceRisk: 91, governanceAuditability: 94 },
-  9: { health: 84, performanceQuality: 86, behaviorDrift: 81, accessToolControl: 78, complianceRisk: 82, governanceAuditability: 85 },
-  10: { health: 80, performanceQuality: 77, behaviorDrift: 75, accessToolControl: 82, complianceRisk: 78, governanceAuditability: 80 },
-  11: { health: 89, performanceQuality: 92, behaviorDrift: 88, accessToolControl: 90, complianceRisk: 91, governanceAuditability: 87 },
+  8: { health: 96, performanceQuality: 95, behaviorDrift: 97, accessToolControl: 96, complianceRisk: 98, governanceAuditability: 95 },
+  9: { health: 93, performanceQuality: 92, behaviorDrift: 94, accessToolControl: 90, complianceRisk: 91, governanceAuditability: 93 },
+  10: { health: 96, performanceQuality: 95, behaviorDrift: 96, accessToolControl: 97, complianceRisk: 95, governanceAuditability: 96 },
+  11: { health: 98, performanceQuality: 97, behaviorDrift: 96, accessToolControl: 95, complianceRisk: 98, governanceAuditability: 97 },
   12: { health: 35, performanceQuality: 40, behaviorDrift: 45, accessToolControl: 38, complianceRisk: 42, governanceAuditability: 50 },
   13: { health: 42, performanceQuality: 48, behaviorDrift: 35, accessToolControl: 50, complianceRisk: 46, governanceAuditability: 52 },
-  14: { health: 78, performanceQuality: 74, behaviorDrift: 77, accessToolControl: 79, complianceRisk: 75, governanceAuditability: 82 },
-  15: { health: 81, performanceQuality: 76, behaviorDrift: 79, accessToolControl: 72, complianceRisk: 74, governanceAuditability: 80 },
-  16: { health: 86, performanceQuality: 80, behaviorDrift: 82, accessToolControl: 84, complianceRisk: 82, governanceAuditability: 85 },
-  17: { health: 73, performanceQuality: 70, behaviorDrift: 75, accessToolControl: 77, complianceRisk: 69, governanceAuditability: 76 },
-  18: { health: 80, performanceQuality: 82, behaviorDrift: 78, accessToolControl: 80, complianceRisk: 77, governanceAuditability: 84 },
+  14: { health: 94, performanceQuality: 91, behaviorDrift: 93, accessToolControl: 92, complianceRisk: 90, governanceAuditability: 94 },
+  15: { health: 96, performanceQuality: 97, behaviorDrift: 95, accessToolControl: 96, complianceRisk: 98, governanceAuditability: 95 },
+  16: { health: 97, performanceQuality: 96, behaviorDrift: 95, accessToolControl: 97, complianceRisk: 96, governanceAuditability: 98 },
+  17: { health: 95, performanceQuality: 96, behaviorDrift: 97, accessToolControl: 95, complianceRisk: 96, governanceAuditability: 95 },
+  18: { health: 98, performanceQuality: 97, behaviorDrift: 96, accessToolControl: 95, complianceRisk: 97, governanceAuditability: 98 },
 };
 
 /** Scores use the seeded demo telemetry across all dimensions; they do not imply live agent execution. */
@@ -119,7 +120,7 @@ export function evaluateAgentTrust(row: AgentReviewRow): AgentTrustEvaluation {
     scores,
     trustScore,
     evidenceCoverage,
-    band: trustScore == null ? 'UNSCORED' : trustScore >= 80 ? 'GREEN' : trustScore >= 60 ? 'AMBER' : 'RED',
+    band: trustScore == null ? 'UNSCORED' : trustBandForScore(trustScore),
   };
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONTROL_TOWER_AGENTS, dataQualityNames, randomPlatformHealth, SERVICE_PROCESSES, serviceAgentNames } from '@/lib/controlTowerData';
+import { trustBandForScore } from '@/lib/trustScore';
 
 describe('control tower demo catalogue', () => {
   it('contains 20 compliance, 19 platform, and 16 data quality records from the supplied lists', () => {
@@ -13,7 +14,7 @@ describe('control tower demo catalogue', () => {
 
   it('keeps each illustrative trust score within the displayed 0–100 scale', () => {
     expect(CONTROL_TOWER_AGENTS.every(agent => agent.trustScore >= 0 && agent.trustScore <= 100)).toBe(true);
-    expect(CONTROL_TOWER_AGENTS.every(agent => agent.band === (agent.trustScore >= 80 ? 'GREEN' : agent.trustScore >= 60 ? 'AMBER' : 'RED'))).toBe(true);
+    expect(CONTROL_TOWER_AGENTS.every(agent => agent.band === (agent.trustScore >= 95 ? 'GREEN' : agent.trustScore >= 90 ? 'AMBER' : 'RED'))).toBe(true);
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'RED').length).toBeGreaterThan(0);
   });
 
@@ -21,6 +22,13 @@ describe('control tower demo catalogue', () => {
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'RED')).toHaveLength(2);
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'AMBER')).toHaveLength(6);
     expect(CONTROL_TOWER_AGENTS.filter(agent => agent.band === 'GREEN')).toHaveLength(159);
+  });
+
+  it('classifies trust scores at the requested inclusive boundaries', () => {
+    expect(trustBandForScore(89)).toBe('RED');
+    expect(trustBandForScore(90)).toBe('AMBER');
+    expect(trustBandForScore(94)).toBe('AMBER');
+    expect(trustBandForScore(95)).toBe('GREEN');
   });
 
   it('randomizes platform process health within the requested 85–99 range', () => {

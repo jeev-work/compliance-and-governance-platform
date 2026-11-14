@@ -178,7 +178,7 @@ export function AgentReviewView({ mode, onClose }: { mode: ReviewMode; onClose: 
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Scores use seeded illustrative demo telemetry across all six dimensions. Values are mock data, not live agent runs or evidence of actual execution. GREEN ≥80, AMBER 60–79, RED &lt;60. Exactly three seeded agents are RED.</p>
+                <p className="mt-2 border-t border-border pt-2 leading-relaxed">Scores use seeded illustrative demo telemetry across all six dimensions. Values are mock data, not live agent runs or evidence of actual execution. GREEN ≥95, AMBER 90–94, RED &lt;90. Exactly three seeded agents are RED.</p>
               </PopoverContent>
             </Popover>
             <div className="relative ml-auto w-56 max-w-full">
